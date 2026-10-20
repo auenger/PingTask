@@ -18,7 +18,7 @@ struct WheelSector: Shape {
 }
 
 enum PingArtwork {
-    static let names = ["png_enemymissing_128x128", "png_assist_me_128x128", "png_all_in", "pingwheel_omw", "pingwheel_basicpingrender"]
+    static let names = ["png_enemymissing_128x128", "png_assist_me_128x128", "png_all_in", "omw", "pingwheel_basicpingrender"]
     static func name(for action: PingAction) -> String {
         switch action.id {
         case "analyze": return names[0]

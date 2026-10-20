@@ -40,6 +40,8 @@ WeChat Connection, and Settings. Fictional-message practice belongs under Settin
 Use the graphite/gold native visual language in `Presentation/AppStyle.swift`.
 MenuBarExtra must receive a separate NSImage sized to 18 x 18 points; a SwiftUI
 frame on a large source image is insufficient. Do not mutate the shared app logo.
+Use `omw.png` for the continuation icon; `pingwheel_omw.png` is the flat variant.
+Inspect upstream artwork pixels before selecting assets, not just filenames.
 
 ## Product invariants
 
