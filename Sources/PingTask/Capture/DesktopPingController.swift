@@ -140,6 +140,8 @@ import ApplicationServices
         guard !busy else { return }
         busy = true; status = "正在截取目标窗口并识别指针附近文字…"
         wheel.feedback(at: target.pointer)
+        // The gesture effect outlives capture progress, including fast captures.
+        effect.show(at: target.pointer, action: action)
         let token = UUID(); generation = token
         Task {
             do {

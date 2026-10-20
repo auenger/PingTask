@@ -47,6 +47,8 @@ Inspect upstream artwork pixels before selecting assets, not just filenames.
 
 1. Releasing a task-mode Ping captures intent; it does not silently dispatch a task.
    Effect-only intents must bypass capture, OCR, wxview and task creation entirely.
+   Task-mode capture also plays the Ping effect; keep its lifetime independent of
+   capture progress and place the progress indicator clear of the icon.
 2. Explicit confirmation freezes the payload for that submission.
 3. Repeated Ping on the same source/action/executor opens the existing
    draft or task and preserves the user's edits.

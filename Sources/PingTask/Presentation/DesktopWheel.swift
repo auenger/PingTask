@@ -145,7 +145,14 @@ private final class OverlayPanel: NSPanel {
     func feedback(at point: CGPoint) {
         hide()
         let position = CaptureGeometry.appKitPoint(point, primaryHeight: CGDisplayBounds(CGMainDisplayID()).height)
-        let panel = OverlayPanel(contentRect: CGRect(x: position.x - 90, y: position.y - 26, width: 180, height: 52), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        let screen = NSScreen.screens.first { $0.frame.contains(position) } ?? NSScreen.main
+        let bounds = screen?.visibleFrame ?? CGRect(x: position.x - 500, y: position.y - 500, width: 1000, height: 1000)
+        // Leave room for the icon and rings; flip above near the bottom edge.
+        let preferredY = position.y - 162 >= bounds.minY + 8 ? position.y - 162 : position.y + 110
+        let frame = CGRect(x: max(bounds.minX + 8, min(position.x - 90, bounds.maxX - 188)),
+                           y: max(bounds.minY + 8, min(preferredY, bounds.maxY - 60)),
+                           width: 180, height: 52)
+        let panel = OverlayPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.level = .screenSaver
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = false
