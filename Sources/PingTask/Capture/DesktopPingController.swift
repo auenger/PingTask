@@ -72,10 +72,11 @@ import ApplicationServices
     private func handle(_ signal: GlobalPingInput.Signal) {
         switch signal {
         case .begin(let point):
-            guard enabled, !busy else { input.disarm(); return }
+            guard enabled, !busy, !store.wheelActions.isEmpty else { input.disarm(); return }
             cancelGesture()
             origin = point
-            frozenActions = store.actions
+            frozenActions = store.wheelActions
+            wheel.state.centerArtwork = store.centerArtwork
             target = try? DesktopCaptureService.target(at: point)
             let expiry = DispatchWorkItem { [weak self] in self?.input.disarm(); self?.cancelGesture() }
             self.expiry = expiry
@@ -95,10 +96,10 @@ import ApplicationServices
                     return
                 }
             }
-            if wheelShown { wheel.state.selected = CaptureGeometry.slice(delta: delta) }
+            if wheelShown { wheel.state.selected = CaptureGeometry.slice(delta: delta, count: frozenActions.count) }
         case .release(let point):
             guard let origin = selectionOrigin ?? origin, wheelShown,
-                  let selected = CaptureGeometry.slice(delta: CGPoint(x: point.x - origin.x, y: point.y - origin.y)),
+                  let selected = CaptureGeometry.slice(delta: CGPoint(x: point.x - origin.x, y: point.y - origin.y), count: frozenActions.count),
                   frozenActions.indices.contains(selected) else { cancelGesture(); return }
             let action = frozenActions[selected]
             let anchor = self.origin ?? point

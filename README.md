@@ -14,18 +14,22 @@
 
 | 页面 | 用途 |
 |---|---|
-| 桌面 Ping | 开启全局手势，查看四方向意图、预览特效，核对捕获来源和最近任务 |
+| 桌面 Ping | 开启全局手势，查看已启用意图、预览特效，核对捕获来源和最近任务 |
 | 任务记录 | 搜索、筛选、编辑草稿、明确提交、续接、取消和删除；Codex 返回 Markdown 预览、原文与快速复制 |
-| Ping 意图 | 编辑动作名称与提示词，选择“创建任务草稿”或“仅播放特效” |
+| Ping 意图 | 新增、搜索、排序和删除意图，配置图片、行为与提示词，设置轮盘中心图与新意图默认图标 |
 | 微信连接 | 检查本机 wxview，按会话与日期查找消息，手动选为任务来源 |
 | 设置 | 切换 Alt / Ctrl，管理系统权限、查看执行器状态和本地数据 |
 
 金色问号用于应用 Logo、Dock 和菜单栏；菜单栏使用独立的 **18 × 18 pt** 图标。界面采用石墨灰与金色，默认进入桌面 Ping。虚构消息的交互练习放在设置底部。
 
 <details>
-<summary>Ping 意图：任务与纯特效</summary>
+<summary>Ping 意图库、图片选择与轮盘</summary>
 
 ![Ping 意图](docs/images/intents.png)
+
+![图片素材库](docs/images/artwork.png)
+
+![默认、八方向与空轮盘预览](docs/images/wheel.png)
 
 </details>
 
@@ -33,6 +37,8 @@
 <summary>任务记录：来源、确认与推进</summary>
 
 ![任务记录（虚构消息）](docs/images/tasks.png)
+
+![Codex Markdown 返回预览（虚构内容）](docs/images/codex-response.png)
 
 </details>
 
@@ -67,7 +73,9 @@ open dist/PingTask.app
 4. **任务意图**松手时也播放对应图标的弹出、扩散环和约 2.2 秒的留存淡出，图标下方独立显示捕获进度（屏幕底部时移至上方）。同时保存目标窗口截图，通过 OCR 和已配置的 wxview 检索消息候选；特效与进度浮层不进入目标窗口截图。核对来源后形成可提交草稿；找不到消息时可明确保留截图来源。
 5. **仅播放特效**只展示图标弹出、扩散环和约 2.2 秒的留存淡出，不截图、不 OCR、不查询微信、不创建任务。意图页的“预览特效”同样不创建任务。
 
-默认四个意图为“分析一下、拆成任务、开始处理、继续推进”，可分别修改名称、提示词与行为。窗口边缘会调整轮盘和选择指针，结束后恢复原始指针；捕获锚点始终保持按下时的位置。
+默认四个意图为“分析一下、拆成任务、开始处理、继续推进”。意图库支持新增、搜索、编辑、排序和删除；轮盘按启用数量分区，最多同时启用 8 个，未启用的意图保留在库中。新意图默认仅播放特效，可切换为任务并配置提示词。删除意图不删除历史任务，修改不覆盖已有任务快照。
+
+图片选择器提供 lolPing 的 32 张 Ping 图标、44 张表情图和 19 张界面图，支持分类、搜索及上传 PNG / JPEG / HEIC / GIF / WebP / TIFF。导入上限 20 MB、边长 8192 像素，转为最长边 512 像素的 PNG 副本保存在 `Artwork/`，动图取第一帧。自定义图片可删除，正在使用的图片需先更换。可设置新意图默认图标、独立更换轮盘中心图并恢复默认；中心区域始终用于取消。窗口边缘会调整轮盘和选择指针，结束后恢复原始指针；捕获锚点始终保持按下时的位置。
 
 ### 微信连接
 
@@ -116,8 +124,10 @@ wxview 使用本地缓存，不保证实时或手机端完整性。当前仅支�
 ```sh
 swift build
 swift run PingTask --self-test
+swift run PingTask --intent-check
 bash scripts/package-app.sh
 ./dist/PingTask.app/Contents/MacOS/PingTask --self-test
+./dist/PingTask.app/Contents/MacOS/PingTask --intent-check
 codesign --verify --deep --strict dist/PingTask.app
 plutil -lint dist/PingTask.app/Contents/Info.plist
 ```
@@ -134,6 +144,9 @@ mkdir -p docs/images
 .build/debug/PingTask --render-desktop 2 docs/images/tasks.png
 .build/debug/PingTask --render-desktop 3 docs/images/wechat.png
 .build/debug/PingTask --render-desktop 6 docs/images/settings.png
+.build/debug/PingTask --render-desktop 7 docs/images/codex-response.png
+.build/debug/PingTask --render-desktop 8 docs/images/artwork.png
+.build/debug/PingTask --render-wheel docs/images/wheel.png
 ```
 
 提交图片前检查是否包含本机路径、账号或其他私人信息。渲染工具使用临时任务存储；连接路径和权限展示仍可能来自运行环境。
@@ -145,10 +158,11 @@ mkdir -p docs/images
 | `Sources/PingTask/main.swift` | 模型、Store、模拟执行、App 与命令行入口 |
 | `Capture/` | 全局输入、窗口截图、捕获协调、几何与自检 |
 | `Resolver/` | OCR 线索与微信候选匹配 |
+| `Intent/` | 意图库、轮盘启用与排序、素材目录、受限的本机图片导入 |
 | `Executor/` | Codex CLI、tmux、SQLite 提交占用、事件与 session 关联 |
 | `SourceAdapter/` | wxview CLI、边界检查和隔离测试 |
 | `Presentation/` | 应用导航、设置、任务、轮盘和特效 |
-| `Resources/` | lolPing PNG 和上游版权说明 |
+| `Resources/` | lolPing 图片、素材目录和上游版权说明 |
 | `scripts/` | icns 生成和本机应用打包 |
 
 `Capture/` 至 `Resources/` 的目录简写均相对于 `Sources/PingTask/`。采用 Apple 原生框架，无第三方运行时依赖。
@@ -162,4 +176,4 @@ mkdir -p docs/images
 
 ## 素材来源
 
-交互和视觉参考 [lolPing](https://github.com/darrenprx/lolPing)，按用户要求使用其 PNG 图标，没有加入音效。上游源码为 MIT，但游戏图片不在 MIT 授权范围内；完整来源与版权边界见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+交互和视觉参考 [lolPing](https://github.com/darrenprx/lolPing)，按用户要求收录全部 95 张 PNG 和 44 张表情 WebP 原文件，没有加入音视频。当前效果使用静态图配合原生弹出、光圈和淡出，尚不播放 WebP 帧动画。上游源码为 MIT，但游戏图片不在 MIT 授权范围内；完整来源与版权边界见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

@@ -1,0 +1,477 @@
+[
+  {
+    "id": "all_in",
+    "title": "全力进攻",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "assist_me",
+    "title": "请求协助",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "caution",
+    "title": "谨慎",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "enemy_missing",
+    "title": "敌人消失",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "enemy_missing_flipped",
+    "title": "倒置问号",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "enemy_vision",
+    "title": "敌方视野",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "generic_ping",
+    "title": "普通标记",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "genericping_cb_128x128",
+    "title": "普通标记 · 蓝色",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "hold_ig",
+    "title": "坚守",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "mt11_18_vision",
+    "title": "视野标记",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "need_vision",
+    "title": "需要视野",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "omw",
+    "title": "正在路上",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "pingwheel_allin_render_01",
+    "title": "进攻 · 利刃",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "pingwheel_allin_render_02",
+    "title": "进攻 · 碎片",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "pingwheel_baitrender",
+    "title": "诱饵",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "pingwheel_basicpingrender",
+    "title": "中心标记",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "pingwheel_cautionrender",
+    "title": "谨慎 · 轮盘",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "pingwheel_enemyvisionrender",
+    "title": "敌方视野 · 红色",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "pingwheel_omw",
+    "title": "正在路上 · 扁平",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "pingwheel_omw_cb",
+    "title": "正在路上 · 蓝色",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "pingwheel_pushrender",
+    "title": "推进 · 轮盘",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "pingwheel_retreatrender",
+    "title": "危险",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "pingwheel_targetrender",
+    "title": "目标 · 红色",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "pingwheel_visionclearedrender",
+    "title": "视野已排除 · 轮盘",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "png_all_in",
+    "title": "交叉利刃",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "png_assist_me_128x128",
+    "title": "协助旗帜",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "png_enemymissing_128x128",
+    "title": "金色问号",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "push",
+    "title": "推进",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "push_cb_128x128",
+    "title": "推进 · 绿色",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "retreat_cb_128x128",
+    "title": "危险 · 粉色",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "target",
+    "title": "目标",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "vision_cleared",
+    "title": "视野已排除",
+    "group": "Ping 图标"
+  },
+  {
+    "id": "lp_emotes_angry_kitty",
+    "title": "我生气了！",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_bee_happy",
+    "title": "小蜜蜂 高兴",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_bee_mad",
+    "title": "小蜜蜂 疯狂",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_bee_sad",
+    "title": "小蜜蜂 悲伤",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_call_me",
+    "title": "双击666！",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_cheeky_poro",
+    "title": "调皮魄罗",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_come_again",
+    "title": "一脸问号",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_come_at_me",
+    "title": "放马过来",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_despair",
+    "title": "呜呜呜---",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_did_you_just",
+    "title": "动态 我太难了！",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_does_not_compute",
+    "title": "无法求解",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_dont_make_me_laugh",
+    "title": "xswl",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_facepalm",
+    "title": "捂脸",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_gasp",
+    "title": "倒吸一口凉气！",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_gg_heart",
+    "title": "精彩的对局 <3",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_good_job_buddy",
+    "title": "干得好，伙计！",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_haha_hilarious",
+    "title": "哈哈笑死",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_hats_off",
+    "title": "脱帽致意",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_how_could_you",
+    "title": "你怎能这样",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_i_will_destroy_you",
+    "title": "你瞅啥？",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_laughing_out_loud",
+    "title": "哈哈哈",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_magpie_oopsie",
+    "title": "雀实有问题",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_maybe_next_time",
+    "title": "也许下次",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_nice",
+    "title": "干得漂亮",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_nice_try",
+    "title": "棒棒哒",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_not_today",
+    "title": "没门！",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_oh",
+    "title": "大受震撼",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_okay",
+    "title": "OK",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_omg_love_it",
+    "title": "我的天，爱死它了",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_pain",
+    "title": "强颜欢笑",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_poro_ride",
+    "title": "溜了溜了",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_poro_snax",
+    "title": "魄罗佳肴",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_sad_kitten",
+    "title": "悲伤猫咪",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_scout_approved",
+    "title": "提莫说很好",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_snoozy_poro",
+    "title": "打盹魄罗",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_such_foolishness",
+    "title": "如此愚蠢",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_super_approved",
+    "title": "超赞的",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_teamwork",
+    "title": "团队协作！",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_think_about_it",
+    "title": "脑子是个好东西",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_unimpressed",
+    "title": "凡人！动态表情",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_unworthy",
+    "title": "弱爆",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_unworthy_cn",
+    "title": "弱爆（文字版）",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_wahaha",
+    "title": "笑哭我了",
+    "group": "表情"
+  },
+  {
+    "id": "lp_emotes_woah_dizzy",
+    "title": "晕晕",
+    "group": "表情"
+  },
+  {
+    "id": "lp_ui_options-buttons",
+    "title": "options-buttons",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_options-field",
+    "title": "options-field",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_options-frame",
+    "title": "options-frame",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_ready-accept-disabled",
+    "title": "ready-accept-disabled",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_ready-accept-hover",
+    "title": "ready-accept-hover",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_ready-accept",
+    "title": "ready-accept",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_ready-background",
+    "title": "ready-background",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_ready-frame",
+    "title": "ready-frame",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_ready-icon",
+    "title": "ready-icon",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_ready-mask",
+    "title": "ready-mask",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_scoreboard-cap",
+    "title": "scoreboard-cap",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_scoreboard-frame",
+    "title": "scoreboard-frame",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_scoreboard-ring",
+    "title": "scoreboard-ring",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_scoreboard-self",
+    "title": "scoreboard-self",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_surrender-button-down",
+    "title": "surrender-button-down",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_surrender-button-hover",
+    "title": "surrender-button-hover",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_surrender-button",
+    "title": "surrender-button",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_surrender-frame",
+    "title": "surrender-frame",
+    "group": "界面素材"
+  },
+  {
+    "id": "lp_ui_surrender-timer",
+    "title": "surrender-timer",
+    "group": "界面素材"
+  }
+]

@@ -110,10 +110,10 @@ struct DesktopCaptureView: View {
                     }.disabled(model.busy)
                 } else {
                     HStack(spacing: 24) {
-                        DesktopWheelView(actions: store.actions, selected: nil, trigger: model.trigger)
+                        DesktopWheelView(actions: store.wheelActions, selected: nil, trigger: model.trigger, centerArtwork: store.centerArtwork)
                         VStack(alignment: .leading, spacing: 22) {
-                            Text("一个手势，四种意图").font(.title3.weight(.semibold))
-                            ForEach(store.actions) { action in
+                            Text(store.wheelActions.isEmpty ? "在意图页启用轮盘动作" : "一个手势，\(store.wheelActions.count) 种意图").font(.title3.weight(.semibold))
+                            ForEach(store.wheelActions) { action in
                                 HStack(spacing: 14) {
                                     if let image = PingArtwork.image(PingArtwork.name(for: action)) {
                                         Image(nsImage: image).resizable().scaledToFit().frame(width: 28, height: 28)

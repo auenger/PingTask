@@ -111,9 +111,13 @@ import Vision
 
 @MainActor func renderWheelPreview(to url: URL) throws {
     _ = NSApplication.shared
+    let extended = PingAction.defaults + (0..<4).map { index in
+        PingAction(id: "fixture-\(index)", name: ["开心", "请求视野", "问号", "捂脸"][index], symbol: "star",
+                   artwork: ["lp_emotes_bee_happy", "need_vision", "enemy_missing_flipped", "lp_emotes_facepalm"][index], effectOnly: true, prompt: "")
+    }
     let view = VStack(spacing: 0) {
         HStack(spacing: 0) { DesktopWheelView(actions: PingAction.defaults, selected: nil); DesktopWheelView(actions: PingAction.defaults, selected: 0) }
-        HStack(spacing: 0) { DesktopWheelView(actions: PingAction.defaults, selected: 1); DesktopWheelView(actions: PingAction.defaults, selected: 3) }
+        HStack(spacing: 0) { DesktopWheelView(actions: extended, selected: 5, centerArtwork: "lp_emotes_poro_snax"); DesktopWheelView(actions: [], selected: nil) }
     }.padding(20).background(Color(red: 0.12, green: 0.15, blue: 0.19))
     let renderer = ImageRenderer(content: view)
     renderer.scale = 2
@@ -158,7 +162,9 @@ import Vision
     }
     let model = DesktopPingController(store: store)
     let content = Group {
-        if tab == 7 {
+        if tab == 8 {
+            ArtworkPicker(store: store, current: "png_enemymissing_128x128", choose: { _ in })
+        } else if tab == 7 {
             ScrollView {
                 CodexResponseView(markdown: """
                 # 执行结果预览

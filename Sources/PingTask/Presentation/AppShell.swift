@@ -154,9 +154,9 @@ struct ContentView: View {
 
     var wheel: some View {
         ZStack {
-            DesktopWheelView(actions: store.actions, selected: store.actions.firstIndex { $0.id == hovered }, trigger: desktop.trigger)
-            ForEach(Array(store.actions.enumerated()), id: \.element.id) { i, action in
-                let angle = Double(i) * .pi / 2 - .pi / 2
+            DesktopWheelView(actions: store.wheelActions, selected: store.wheelActions.firstIndex { $0.id == hovered }, trigger: desktop.trigger, centerArtwork: store.centerArtwork)
+            ForEach(Array(store.wheelActions.enumerated()), id: \.element.id) { i, action in
+                let angle = CaptureGeometry.angle(index: i, count: store.wheelActions.count)
                 Button { capture(action) } label: {
                     Color.clear.frame(width: 80, height: 80).contentShape(Rectangle())
                 }.buttonStyle(.plain).offset(x: cos(angle) * 98, y: sin(angle) * 98)
@@ -175,9 +175,8 @@ struct ContentView: View {
 
     func actionAt(_ delta: CGSize) -> PingAction? {
         guard hypot(delta.width, delta.height) > 48 else { return nil }
-        let angle = atan2(delta.height, delta.width) + .pi / 2
-        let index = (Int((angle / (.pi / 2)).rounded()) + 4) % 4
-        return store.actions.indices.contains(index) ? store.actions[index] : nil
+        guard let index = CaptureGeometry.slice(delta: CGPoint(x: delta.width, y: delta.height), count: store.wheelActions.count) else { return nil }
+        return store.wheelActions[index]
     }
 
     func capture(_ action: PingAction) {

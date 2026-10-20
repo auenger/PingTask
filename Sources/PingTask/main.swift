@@ -7,6 +7,8 @@ struct PingAction: Codable, Identifiable {
     var id: String
     var name: String
     var symbol: String
+    var artwork: String? = nil
+    var onWheel: Bool? = nil
     var effectOnly: Bool? = nil
     var createsTask: Bool { effectOnly != true }
     var prompt: String
@@ -83,10 +85,14 @@ enum Identity {
 struct SavedState: Codable {
     var actions: [PingAction]
     var tasks: [TaskRecord]
+    var centerArtwork: String?
+    var defaultArtwork: String?
 }
 
 @MainActor final class Store: ObservableObject {
     @Published var actions = PingAction.defaults
+    @Published var centerArtwork = "pingwheel_basicpingrender"
+    @Published var defaultArtwork = "png_enemymissing_128x128"
     @Published var tasks: [TaskRecord] = []
     @Published var selected: UUID?
     @Published var notice = "就绪 · 截图与任务记录仅保存在本机"
@@ -94,7 +100,7 @@ struct SavedState: Codable {
     @Published var codexBusy = Set<UUID>()
     var refreshingCodex = false
     let isolated: Bool
-    private let file: URL
+    let file: URL
 
     init(fileURL: URL? = nil) {
         isolated = fileURL != nil
@@ -104,6 +110,8 @@ struct SavedState: Codable {
         do {
             let state = try JSONDecoder().decode(SavedState.self, from: Data(contentsOf: file))
             actions = state.actions
+            centerArtwork = state.centerArtwork ?? "pingwheel_basicpingrender"
+            defaultArtwork = state.defaultArtwork ?? "png_enemymissing_128x128"
             tasks = state.tasks
             // A crashed demo process must not invent completion or re-submit on restart.
             for i in tasks.indices where tasks[i].status == "模拟执行中" {
@@ -116,7 +124,7 @@ struct SavedState: Codable {
     @discardableResult func save() -> Bool {
         do {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try JSONEncoder().encode(SavedState(actions: actions, tasks: tasks)).write(to: file, options: .atomic)
+            try JSONEncoder().encode(SavedState(actions: actions, tasks: tasks, centerArtwork: centerArtwork, defaultArtwork: defaultArtwork)).write(to: file, options: .atomic)
             return true
         } catch {
             notice = "保存失败：\(error.localizedDescription)"
@@ -366,6 +374,11 @@ if let index = CommandLine.arguments.firstIndex(of: "--codex-worker"), CommandLi
 } else if CommandLine.arguments.contains("--codex-check") {
     do { try runCodexChecks() }
     catch { fputs("Codex check: \(error.localizedDescription)\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--intent-check") {
+    MainActor.assumeIsolated {
+        do { try runIntentChecks() }
+        catch { fatalError("Intent check failed: \(error)") }
+    }
 } else if CommandLine.arguments.contains("--self-test") {
     MainActor.assumeIsolated {
         runChecks()

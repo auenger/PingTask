@@ -40,10 +40,13 @@ struct DesktopCapture: Codable, Identifiable {
 }
 
 enum CaptureGeometry {
-    static func slice(delta: CGPoint, deadZone: CGFloat = 46) -> Int? {
-        guard hypot(delta.x, delta.y) > deadZone else { return nil }
+    static func angle(index: Int, count: Int) -> Double {
+        Double(index) * (2 * Double.pi / Double(max(1, count))) - Double.pi / 2
+    }
+    static func slice(delta: CGPoint, deadZone: CGFloat = 46, count: Int = 4) -> Int? {
+        guard count > 0, hypot(delta.x, delta.y) > deadZone else { return nil }
         // Input is top-left coordinates: north, east, south, west.
-        return (Int(((atan2(delta.y, delta.x) + .pi / 2) / (.pi / 2)).rounded()) + 4) % 4
+        return (Int(((atan2(delta.y, delta.x) + .pi / 2) / (2 * .pi / Double(count))).rounded()) + count) % count
     }
     static func appKitPoint(_ quartz: CGPoint, primaryHeight: CGFloat) -> CGPoint {
         CGPoint(x: quartz.x, y: primaryHeight - quartz.y)

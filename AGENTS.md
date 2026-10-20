@@ -29,7 +29,8 @@ product behavior:
 - `SourceAdapter/`: bounded wxview CLI calls, schema validation, single-account checks and fixtures.
 - `Resolver/`: title/OCR clues, bounded message search and explicit candidate confirmation.
 - `Presentation/`: sidebar app shell, desktop source review, intent editor, task records, WeChat connection, settings, wheel and transient effects.
-- `Resources/`: upstream PNG artwork and license. The gold question mark is the app logo.
+- `Intent/`: stable intent CRUD, wheel membership/order, artwork catalog and bounded local image import.
+- `Resources/`: upstream PNG/WebP artwork, catalog and license. The gold question mark is the app logo.
 - Runtime state: `~/Library/Application Support/PingTaskPrototype/state.json`; screenshots: sibling `Captures/`. Keep these paths compatible.
 - `scripts/make-icon.sh` generates icns; `scripts/package-app.sh` bundles resources and applies an ad-hoc signature in `dist/`.
 
@@ -198,3 +199,12 @@ Record what was visually inspected and what still requires manual testing.
 - Commit and push only within the user's requested scope. Do not force-push.
 - Never commit `.build/`, `dist/`, local IDE state, or user data.
 - Report what changed, what was verified, and any unimplemented boundary.
+
+## Intent library and artwork
+
+- Keep action IDs stable through edits/reordering. New actions use new UUIDs; deleting an intent never alters task snapshots.
+- The library is unbounded; at most 8 intents are enabled on the wheel. Keep rendering and hit testing on the same frozen ordered list. An empty library must stay empty on reload.
+- Missing `artwork` / `onWheel` and global image fields migrate from old JSON defaults. Save failures must roll back library/default changes.
+- Custom image imports run off the main thread, limit file size/dimensions, and save metadata-free PNG copies under `Artwork/`. Persist opaque IDs, never arbitrary imported paths. Do not commit user images.
+- Center image changes appearance only; center release still cancels. The new-intent default applies only to later additions.
+- `--intent-check` uses isolated storage to verify migration, CRUD, history preservation, rollback, geometry and import. `--render-desktop 8 <path>` renders the bundled gallery; `--render-wheel <path>` includes an 8-slot fixture.

@@ -4,82 +4,166 @@ struct IntentSettingsView: View {
     @ObservedObject var store: Store
     @ObservedObject var desktop: DesktopPingController
     @State private var selected = "analyze"
+    @State private var search = ""
+    @State private var picker: ImageTarget?
+    @State private var deleting: String?
+    private enum ImageTarget: String, Identifiable {
+        case intent, center, defaultIcon
+        var id: String { rawValue }
+    }
+    private var action: PingAction? { store.actions.first { $0.id == selected } }
+    private var results: [PingAction] {
+        store.actions.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || $0.prompt.localizedCaseInsensitiveContains(search) }
+    }
     var body: some View {
-        VStack(alignment: .leading, spacing: 26) {
-            PageHeading(title: "Ping 意图", subtitle: "同一个手势，可以推进一件事，也可以只是表达一下。")
-            HStack(alignment: .top, spacing: 28) {
-                VStack(spacing: 8) {
-                    ForEach(Array(store.actions.enumerated()), id: \.element.id) { index, action in
-                        Button { selected = action.id } label: {
-                            HStack(spacing: 14) {
-                                if let image = PingArtwork.image(PingArtwork.name(for: action)) {
-                                    Image(nsImage: image).resizable().scaledToFit().frame(width: 32, height: 32)
-                                }
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text(action.name).fontWeight(.medium)
-                                    Text(["上", "右", "下", "左"][index % 4] + " · " + (action.createsTask ? "任务意图" : "仅播放特效"))
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
-                            }.padding(16).frame(width: 220)
-                                .background(selected == action.id ? AppStyle.gold.opacity(0.10) : Color.white.opacity(0.025), in: RoundedRectangle(cornerRadius: 12))
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(selected == action.id ? AppStyle.gold.opacity(0.3) : .clear))
-                        }.buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: 20) {
+            PageHeading(title: "Ping 意图", subtitle: "配置你的表达方式。轮盘最多启用 8 个意图，其他意图保留在库中。")
+            HStack(alignment: .top, spacing: 24) {
+                sidebar.frame(width: 240)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        wheelSettings
+                        if let action { editor(action) }
+                        else { QuietEmptyState(symbol: "sparkles", title: "创建一个 Ping 意图", message: "选择图标、行为与提示词，组合成你自己的轮盘。") }
                     }
-                    Text("修改只应用于之后的 Ping，\n已有任务保留原来的内容。").font(.caption).foregroundStyle(.secondary).padding(.top, 16)
-                }
-                if let index = store.actions.firstIndex(where: { $0.id == selected }) {
-                    editor(index)
                 }
             }
-            Spacer(minLength: 0)
         }.padding(28)
+            .onAppear { if action == nil { selected = store.actions.first?.id ?? "" } }
+            .sheet(item: $picker) { target in
+                ArtworkPicker(store: store, current: target == .center ? store.centerArtwork : target == .defaultIcon ? store.defaultArtwork : action.map { PingArtwork.name(for: $0) } ?? store.defaultArtwork) { ref in
+                    switch target {
+                    case .intent: store.updateIntent(selected) { $0.artwork = ref }
+                    case .center: store.changeIntents { store.centerArtwork = ref }
+                    case .defaultIcon: store.changeIntents { store.defaultArtwork = ref }
+                    }
+                }
+            }
+            .confirmationDialog("删除此意图？已有任务保留原来的名称与提示词。", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
+                Button("删除意图", role: .destructive) {
+                    if let id = deleting, store.deleteIntent(id) { selected = store.actions.first?.id ?? "" }
+                    deleting = nil
+                }
+                Button("取消", role: .cancel) { deleting = nil }
+            }
     }
-    func editor(_ index: Int) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("意图名称").font(.caption).foregroundStyle(.secondary)
-                        TextField("给这个动作起个名字", text: $store.actions[index].name)
-                            .font(.title2.weight(.semibold)).textFieldStyle(.plain)
-                            .onChange(of: store.actions[index].name) { _ in store.save() }
+    private var sidebar: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("意图库 · \(store.actions.count)").font(.headline)
+                Spacer()
+                Button {
+                    if let id = store.addIntent() { selected = id; search = "" }
+                } label: { Image(systemName: "plus") }.help("新增意图")
+            }
+            TextField("搜索名称或提示词", text: $search).textFieldStyle(.roundedBorder)
+            ScrollView {
+                VStack(spacing: 8) {
+                    ForEach(results) { item in
+                        Button { selected = item.id } label: {
+                            HStack(spacing: 12) {
+                                artwork(PingArtwork.name(for: item), size: 32)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(item.name.isEmpty ? "未命名意图" : item.name).fontWeight(.medium).lineLimit(1)
+                                    Text(position(item) + " · " + (item.createsTask ? "任务" : "仅特效"))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 0)
+                            }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                                .background(selected == item.id ? AppStyle.gold.opacity(0.12) : Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(selected == item.id ? AppStyle.gold.opacity(0.35) : .clear))
+                        }.buttonStyle(.plain)
                     }
-                    Spacer()
-                    Button { desktop.playEffect(store.actions[index]) } label: { Label("预览特效", systemImage: "play.fill") }
                 }
-                Divider()
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("松手之后").font(.headline)
-                    Picker("行为", selection: Binding(get: { store.actions[index].effectOnly == true }, set: { store.actions[index].effectOnly = $0; store.save() })) {
-                        Text("创建任务草稿").tag(false)
-                        Text("仅播放特效").tag(true)
-                    }.pickerStyle(.segmented)
-                    Text(store.actions[index].createsTask ? "捕获来源，等待你核对后提交。不会自动执行。" : "图标与光圈短暂留在屏幕上，然后淡出。不截图、不查询消息、不创建任务。")
-                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if results.isEmpty { Text("没有匹配的意图").font(.caption).foregroundStyle(.secondary).padding() }
+            }
+            Text("修改仅用于之后的 Ping，\n已有任务内容保持不变。")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+    private var wheelSettings: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("轮盘与默认图片").font(.headline)
+                Spacer()
+                Text("\(store.wheelActions.count) / 8 已启用").font(.caption).foregroundStyle(.secondary)
+            }
+            HStack(spacing: 16) {
+                artwork(store.centerArtwork, size: 40)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("轮盘中心图片")
+                    Text("每次触发使用此图；回中心仍取消 Ping。") .font(.caption).foregroundStyle(.secondary)
                 }
-                if store.actions[index].createsTask {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("任务提示词").font(.headline)
-                        Text("描述希望执行器如何理解和处理这次 Ping。").font(.caption).foregroundStyle(.secondary)
-                        TextEditor(text: $store.actions[index].prompt).font(.system(size: 13)).scrollContentBackground(.hidden)
-                            .frame(minHeight: 210).padding(12).background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
-                            .onChange(of: store.actions[index].prompt) { _ in store.save() }
-                        Label("任务草稿需明确确认，才会交给设置中的 Codex CLI。", systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
-                    }
-                } else {
+                Spacer()
+                Button("更换") { picker = .center }
+                Button("恢复默认") { store.changeIntents { store.centerArtwork = PingArtwork.centerDefault } }
+            }
+            Divider()
+            HStack(spacing: 16) {
+                artwork(store.defaultArtwork, size: 32)
+                Text("新意图默认图标").font(.callout)
+                Spacer()
+                Button("设置默认图标") { picker = .defaultIcon }
+            }
+        }.appSurface()
+    }
+    private func editor(_ value: PingAction) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(spacing: 18) {
+                Button { picker = .intent } label: { artwork(PingArtwork.name(for: value), size: 64).padding(12).background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 12)) }.buttonStyle(.plain).help("更换意图图片")
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("意图名称", text: binding(value, \.name)).font(.title2.weight(.semibold)).textFieldStyle(.plain)
                     HStack {
-                        Spacer()
-                        if let image = PingArtwork.image(PingArtwork.name(for: store.actions[index])) {
-                            Image(nsImage: image).resizable().scaledToFit().frame(width: 100, height: 100).padding(40)
-                        }
-                        Spacer()
-                    }
-                    Text("保留这一刻的表达。约 2.2 秒后，画面恢复如常。").font(.caption).foregroundStyle(.secondary)
+                        Button("更换图片") { picker = .intent }
+                        Button("设为新意图默认图标") { store.changeIntents { store.defaultArtwork = PingArtwork.name(for: value) } }
+                    }.font(.caption)
                 }
+                Spacer()
+                Button { desktop.playEffect(value) } label: { Label("预览", systemImage: "play.fill") }
+            }
+            HStack {
+                Toggle("显示在轮盘", isOn: Binding(get: { value.onWheel != false }, set: { store.setOnWheel(value.id, enabled: $0) }))
+                    .toggleStyle(.switch)
+                Spacer()
+                Button { store.moveIntent(value.id, by: -1) } label: { Image(systemName: "arrow.up") }.help("向前移动")
+                    .disabled(store.actions.first?.id == value.id)
+                Button { store.moveIntent(value.id, by: 1) } label: { Image(systemName: "arrow.down") }.help("向后移动")
+                    .disabled(store.actions.last?.id == value.id)
+                Text("从上方顺时针排列").font(.caption).foregroundStyle(.secondary)
+            }
+            Divider()
+            Picker("松手之后", selection: Binding(get: { value.effectOnly == true }, set: { setEffect(value.id, $0) })) {
+                Text("创建任务草稿").tag(false)
+                Text("仅播放特效").tag(true)
+            }.pickerStyle(.segmented)
+            Text(value.createsTask ? "捕获来源，等待核对与确认后交给执行器。" : "播放图片、弹出光圈和留存淡出，不截图、不查询消息、不创建任务。")
+                .font(.callout).foregroundStyle(.secondary)
+            if value.createsTask {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("任务提示词").font(.headline)
+                    TextEditor(text: binding(value, \.prompt)).font(.system(size: 13)).scrollContentBackground(.hidden)
+                        .frame(minHeight: 160).padding(12).background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            HStack {
                 Label("修改自动保存", systemImage: "checkmark.circle").font(.caption).foregroundStyle(.secondary)
-            }.appSurface()
-        }.id(store.actions[index].id)
+                Spacer()
+                Button("恢复默认图片") { store.updateIntent(value.id) { $0.artwork = PingAction.defaults.contains(where: { $0.id == value.id }) ? nil : store.defaultArtwork } }
+                Button("删除意图", role: .destructive) { deleting = value.id }
+            }
+        }.appSurface().id(value.id)
+    }
+    private func setEffect(_ id: String, _ enabled: Bool) { store.updateIntent(id) { $0.effectOnly = enabled } }
+    private func binding(_ value: PingAction, _ path: WritableKeyPath<PingAction, String>) -> Binding<String> {
+        Binding(get: { store.actions.first(where: { $0.id == value.id })?[keyPath: path] ?? value[keyPath: path] },
+                set: { text in store.updateIntent(value.id) { $0[keyPath: path] = text } })
+    }
+    private func position(_ value: PingAction) -> String {
+        guard let index = store.wheelActions.firstIndex(where: { $0.id == value.id }) else { return "仅保留在库" }
+        return store.wheelActions.count == 4 ? ["上", "右", "下", "左"][index] : "轮盘 \(index + 1)"
+    }
+    private func artwork(_ name: String, size: CGFloat) -> some View {
+        Group { if let image = PingArtwork.image(name) { Image(nsImage: image).resizable().scaledToFit() } }
+            .frame(width: size, height: size)
     }
 }
