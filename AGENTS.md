@@ -19,24 +19,34 @@ product behavior:
 
 ## Current implementation
 
-- Swift Package Manager executable, SwiftUI and AppKit, no third-party dependencies.
-- Deployment target macOS 13; older OS compatibility still needs real testing.
-- `Sources/PingTask/main.swift` contains the prototype UI, models, Store,
-  deterministic demo messages, simulated executor, and `--self-test`.
-- Runtime state: `~/Library/Application Support/PingTaskPrototype/state.json`.
-- `scripts/package-app.sh` builds a host-architecture `.app` in `dist/` and
-  applies an ad-hoc signature for local development.
+- Swift Package Manager executable, SwiftUI and AppKit, no third-party runtime dependencies.
+- Deployment target macOS 13; macOS 13 capture and multi-display behavior still need real testing.
+- `main.swift`: models, Store, deterministic demo data, simulated executor, app and CLI entry points.
+- `Capture/`: configurable Alt / Ctrl event tap, single-window ScreenCaptureKit capture, Vision OCR, capture controller and isolated checks.
+- `SourceAdapter/`: bounded wxview CLI calls, schema validation, single-account checks and fixtures.
+- `Resolver/`: title/OCR clues, bounded message search and explicit candidate confirmation.
+- `Presentation/`: sidebar app shell, desktop source review, intent editor, task records, WeChat connection, settings, wheel and transient effects.
+- `Resources/`: upstream PNG artwork and license. The gold question mark is the app logo.
+- Runtime state: `~/Library/Application Support/PingTaskPrototype/state.json`; screenshots: sibling `Captures/`. Keep these paths compatible.
+- `scripts/make-icon.sh` generates icns; `scripts/package-app.sh` bundles resources and applies an ad-hoc signature in `dist/`.
 
-This is a prototype. Real screen capture, global gestures, chat lookup, external
-executors, transactional storage, and cross-process coordination are not
-implemented. Keep simulation labels visible. Never report simulated execution
-as actual code changes, tests, or completed external work.
+Real global gestures, window capture, OCR and wxview lookup are implemented.
+External executors, transactional storage and cross-process coordination are not.
+Keep simulation labels at submission and execution status; do not put prototype
+banners back on the main UI. Never describe simulated results as real external work.
+
+The five sidebar pages are Desktop Ping (default), Task Records, Ping Intents,
+WeChat Connection, and Settings. Fictional-message practice belongs under Settings.
+Use the graphite/gold native visual language in `Presentation/AppStyle.swift`.
+MenuBarExtra must receive a separate NSImage sized to 18 x 18 points; a SwiftUI
+frame on a large source image is insufficient. Do not mutate the shared app logo.
 
 ## Product invariants
 
-1. Releasing a Ping captures intent; it does not silently dispatch a task.
+1. Releasing a task-mode Ping captures intent; it does not silently dispatch a task.
+   Effect-only intents must bypass capture, OCR, wxview and task creation entirely.
 2. Explicit confirmation freezes the payload for that submission.
-3. Repeated Ping on the same source/action/project/executor opens the existing
+3. Repeated Ping on the same source/action/executor opens the existing
    draft or task and preserves the user's edits.
 4. Repeated submit cannot create another revision while the current one is active.
 5. Continuation requires an explicit action and new information; it creates a
@@ -47,6 +57,10 @@ as actual code changes, tests, or completed external work.
 8. An ambiguous source or unknown dispatch outcome must remain visible.
    Do not guess a conversation or blindly resubmit.
 9. Closing a window or app does not imply a remote task was canceled.
+10. Cancellation stops a draft or local simulation only. Deletion persists record
+    removal before moving unreferenced screenshots to Trash; retain shared files.
+    Persistence failure must roll back state and must not clean up attachments.
+11. Switching an intent to effect-only affects future Pings, not existing tasks.
 
 The prototype's “继续推进” wheel item is a configurable intent demonstration.
 Actual prototype continuation happens through the existing record's button.
@@ -57,7 +71,7 @@ Production continuation must resolve an existing task explicitly.
 - Use stable action IDs, never editable labels as identifiers.
 - Production source identity includes platform, account/tenant, conversation,
   and message identity.
-- Production project/executor identity uses stable IDs and profiles.
+- Executor identity uses stable IDs and profiles. Project selection was removed by user request.
 - Keep internal task ID, submission revision, operation ID, payload hash,
   and external task/session ID separate.
 - One operation ID must always refer to exactly one immutable payload.
@@ -67,6 +81,7 @@ Production continuation must resolve an existing task explicitly.
 - Remote exactly-once behavior cannot be promised without remote support.
   Unknown outcomes require reconciliation before retry.
 - Tests must use temporary storage and leave user records untouched.
+- Legacy JSON may contain project fields; ignore them without rewriting historical operation IDs.
 
 ## Native implementation conventions
 
@@ -82,12 +97,16 @@ Production continuation must resolve an existing task explicitly.
 - Exclude the app's own overlay from capture.
 - Idle operation must not continuously capture screens, run OCR, or poll
   chat discovery. Limit concurrent operations and bound active-task polling.
-- As real capabilities are added, split the single-file prototype by the
-  architecture's module boundaries; do not expand it indefinitely.
+- Keep UI in Presentation and capture/integration code in their respective modules;
+  do not grow main.swift back into a monolithic UI.
+- Refresh permission display when the app becomes active. Do not equate a CLI
+  child process permission result with the running GUI process's permission state.
+- Ad-hoc rebuilds may invalidate prior privacy grants. Do not reset TCC or weaken
+  code-signing requirements to bypass system authorization.
 
 ## Integrations and private data
 
-- Source adapters: wxview, lark-cli, dws. Executor adapters: Codex, WorkBuddy.
+- Implemented source adapter: wxview. Planned: lark-cli, dws; executors Codex and WorkBuddy.
 - Inspect actual CLI help/schema and official API contracts before using
   commands; do not invent parameters, IDs, or supported capabilities.
 - Invoke commands with executable + argument arrays, never user text
@@ -99,7 +118,9 @@ Production continuation must resolve an existing task explicitly.
 - Do not automatically initialize wxview keys, read process memory, reset
   shared checkpoints, or start unrelated services.
 - Never commit real screenshots, chat exports, runtime state, credentials,
-  tokens, keys, or private logs. Keep credentials outside tracked files,
+  tokens, keys, or private logs. Synthetic native UI renders in docs/images are
+  allowed only after checking for local paths, accounts and private content.
+  Keep credentials outside tracked files,
   using appropriate OS credential storage.
 - Do not embed confidential OAuth client secrets in a distributed desktop app.
 - Do not send chat messages, publish tasks, or make live external changes
@@ -129,13 +150,34 @@ For UI changes, follow the manual checklist and report whether visual
 inspection actually occurred. Compilation does not establish visual correctness.
 Documentation-only changes need link/content checks, not a full rebuild.
 
+## Documentation screenshots
+
+Use the native isolated renderer rather than capturing the user's desktop:
+
+```sh
+swift build
+mkdir -p docs/images
+.build/debug/PingTask --render-desktop 4 docs/images/desktop.png
+.build/debug/PingTask --render-desktop 1 docs/images/intents.png
+.build/debug/PingTask --render-desktop 2 docs/images/tasks.png
+.build/debug/PingTask --render-desktop 3 docs/images/wechat.png
+.build/debug/PingTask --render-desktop 6 docs/images/settings.png
+```
+
+The renderer uses temporary Store files and fictional task data. It can still
+read local preferences for trigger/path and system permissions: inspect every
+image before publishing. Do not present these renders as end-to-end validation
+of global input, actual capture, wxview matching, menu-bar sizing, or animation.
+Record what was visually inspected and what still requires manual testing.
+
 ## Documentation and collaboration
 
 - Keep README and roadmap status consistent with what actually runs.
 - Label design contracts as proposed until adapters implement them.
 - Prefer Chinese for user-facing product copy and design docs.
-- Use original/system assets; lolPing is an interaction reference.
-  Do not copy Riot game artwork or sounds into the project.
+- Per the updated user request, this local prototype includes lolPing PNG artwork.
+  Preserve THIRD_PARTY_NOTICES.md and the upstream license; its MIT license excludes Riot assets.
+  Do not add sounds without a product request.
 - Do not discard unrelated changes or overwrite existing remote history.
 - Commit and push only within the user's requested scope. Do not force-push.
 - Never commit `.build/`, `dist/`, local IDE state, or user data.

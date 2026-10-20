@@ -1,99 +1,102 @@
 # PingTask
 
-Swift 原生 macOS 桌面任务入口：指向一条信息，选择意图，确认后交给现有 Agent，并保存来源与推进记录。
+**指向信息，表达意图，让事情往前推进。**
 
-**指一下信息，确认要做什么，让已有 Agent 接着推进。**
+一个使用 SwiftUI + AppKit 构建的原生 macOS 应用。按住 Alt / Ctrl，移动指针选择 Ping 意图，松手保存截图草稿；也可以只播放一个短暂的特效。
 
-PingTask 负责桌面捕获、上下文交接和任务留痕。代码实现与复杂任务执行交给 Codex / WorkBuddy；微信、飞书和钉钉计划分别通过 wxview、lark-cli 和 dws 接入。项目独立于 wxview。
+已实现全局轮盘、窗口截图、Vision OCR、wxview 消息候选定位和本地任务管理。**Codex / WorkBuddy 尚未接入，确认提交目前仅运行本地模拟。**
 
-> 当前阶段：可运行的原生交互原型。所有渠道消息与执行结果均为模拟数据，尚未接入真实截图或外部服务。
+![桌面 Ping](docs/images/desktop.png)
 
-## 功能状态
+> 图片由当前原生界面离屏渲染，使用隔离存储和虚构消息，不包含真实聊天或桌面截图。图片展示不代表全局权限、真实截图和动态效果已完成实机验收。
 
-| 能力 | 当前状态 |
+## 五个功能入口
+
+| 页面 | 用途 |
 |---|---|
-| 原生窗口、菜单栏入口 | 已实现 |
-| 四方向 Ping 轮盘、点击和窗口内拖动 | 已实现 |
-| 每个动作独立编辑名称和提示词 | 已实现 |
-| 确认卡、提示词快照、补充说明 | 已实现 |
-| 重复 Ping 合并、提交保护、显式续接 | 已实现，限本地模拟 |
-| 历史记录、配置和推进细节持久化 | 已实现，JSON 原型存储 |
-| 全局手势、真实截图、窗口和消息识别 | 规划中 |
-| wxview / lark-cli / dws 查询 | 规划中 |
-| Codex / WorkBuddy 调度和状态同步 | 规划中 |
-| SQLite outbox、远端幂等与故障恢复 | 规划中 |
+| 桌面 Ping | 开启全局手势，查看四方向意图、预览特效，核对捕获来源和最近任务 |
+| 任务记录 | 搜索、筛选、编辑草稿、明确提交、续接、取消和删除 |
+| Ping 意图 | 编辑动作名称与提示词，选择“创建任务草稿”或“仅播放特效” |
+| 微信连接 | 检查本机 wxview，按会话与日期查找消息，手动选为任务来源 |
+| 设置 | 切换 Alt / Ctrl，管理系统权限、查看执行器状态和本地数据 |
 
-## 当前交付
+金色问号用于应用 Logo、Dock 和菜单栏；菜单栏使用独立的 **18 × 18 pt** 图标。界面采用石墨灰与金色，默认进入桌面 Ping。虚构消息的交互练习放在设置底部。
 
-- [产品设计](docs/01-product.md)：用户流程、边界、确认卡和界面设计。
-- [技术设计](docs/02-architecture.md)：原生框架、渠道和执行器接口、记录模型。
-- [确认与幂等协议](docs/03-confirmation-idempotency.md)：重复 Ping、续接、超时和恢复。
-- [功能清单与路线](docs/04-roadmap.md)：原型已实现内容与生产能力区分。
-- [原型验收](docs/05-prototype-checklist.md)：手工验证步骤及测试边界。
-- 可编译运行的 SwiftUI / AppKit 原型，无第三方依赖。
+<details>
+<summary>Ping 意图：任务与纯特效</summary>
 
-## 运行
+![Ping 意图](docs/images/intents.png)
 
-要求：macOS、Swift 6.0+ 工具链及 macOS SDK（Xcode 或 Command Line Tools）。部署目标为 macOS 13+，旧版本兼容性仍需实机验证。本轮在 Intel Mac、Swift 6.2.3 下编译验证。
+</details>
+
+<details>
+<summary>任务记录：来源、确认与推进</summary>
+
+![任务记录（虚构消息）](docs/images/tasks.png)
+
+</details>
+
+<details>
+<summary>微信连接与设置</summary>
+
+![微信连接](docs/images/wechat.png)
+![设置](docs/images/settings.png)
+
+</details>
+
+## 安装与运行
+
+要求 macOS 13+、Swift 6.0+ 工具链和 macOS SDK（Xcode 或 Command Line Tools）。macOS 13 的截图兼容性仍需实机验证。
 
 ```sh
 git clone https://github.com/auenger/PingTask.git
 cd PingTask
-swift run PingTask
-```
-
-生成可双击打开的应用：
-
-```sh
 bash scripts/package-app.sh
 open dist/PingTask.app
 ```
 
-检查核心规则：
+开发时可以执行 `swift run PingTask`。打包脚本生成当前机器架构的应用和问号 icns，使用本机 ad-hoc 签名；尚未提供 Universal 包、Developer ID 签名、公证或自动更新。
 
-```sh
-swift run PingTask --self-test
-```
+## 使用方式
 
-## 原型能体验什么
+### 桌面 Ping
 
-1. 选择虚构的微信 / 飞书 / 钉钉消息。
-2. 点击轮盘动作，或从中心按住拖向动作并松手。
-3. 编辑确认卡的提示词与补充说明，明确确认后模拟提交。
-4. 重复 Ping 同一目标，打开同一条记录，不重复提交。
-5. 模拟完成后，输入新增信息，确认后续接下一轮。
-6. 编辑各 Ping 的名称和内置提示词；重启后保留配置和记录。
+1. 在“设置”选择 **Alt / Option** 或 **Ctrl / Control**，授权辅助功能。任务意图截图还需要屏幕录制权限；纯特效意图无需该权限。
+2. 回到“桌面 Ping”开启全局 Ping。系统要求时重启应用；本地开发包更新后可能需要重新授权。
+3. 指向信息，按住触发键并移动选择动作，松手触发。回中心、Esc、右键或其他按键取消；普通组合键继续传递给当前应用。
+4. **任务意图**保存目标窗口截图，通过 OCR 和已配置的 wxview 检索消息候选。核对来源后形成可提交草稿；找不到消息时可明确保留截图来源。
+5. **仅播放特效**只展示图标弹出、扩散环和约 2.2 秒的留存淡出，不截图、不 OCR、不查询微信、不创建任务。意图页的“预览特效”同样不创建任务。
 
-**当前是交互原型，不会截图真实桌面、读取聊天或调用 Codex / WorkBuddy。**
-没有全局快捷键、真实窗口识别、真实 CLI 调用、真实 Agent 输出和跨消息任务关联。不能以模拟完成作为真实任务完成。
+默认四个意图为“分析一下、拆成任务、开始处理、继续推进”，可分别修改名称、提示词与行为。窗口边缘会调整轮盘和选择指针，结束后恢复原始指针；捕获锚点始终保持按下时的位置。
 
-原型状态文件：`~/Library/Application Support/PingTaskPrototype/state.json`。
-仅保存用户在原型输入的内容和虚构消息。删除该文件可重置演示数据；应用自身没有自动删除行为。
+### 微信连接
 
-## 确认与重复操作
+1. 选择本机 `wxview` 可执行文件，点击“检查连接”。已对照的 CLI 协议版本为 0.4.0。
+2. 查找群聊或联系人，明确选择会话和日期。手动读取指定日期最早的 100 条消息，有截断时显示提示，不自动翻页。
+3. 选为 Ping 来源，选择意图并核对草稿。只保存选中的来源正文，候选列表不落盘。
 
-- 松手只生成草稿，用户点击“确认提交”才进入模拟执行。
-- 同一消息、动作、项目及执行器再次 Ping，打开原记录并保留编辑。
-- 执行中重复点击不创建下一轮。
-- 完成后需添加新信息并明确确认，才能继续。
-- 模板更新不会覆盖已经捕获的提示词快照。
-- 重启发现未结束的模拟执行时，标记“待核对”，不自动重新提交。
+桌面自动定位只适用于微信窗口（`com.tencent.xinWeChat`）。默认检索最近 **30 天**，每次最多 **20 条**消息，可修改日期范围（最长 366 天）。唯一标题候选可以继续自动检索，但最终消息始终由用户核对；OCR 相似度不是权威消息身份。
 
-本地去重不能替代远端幂等。未来接入执行器时，超时但结果未知的请求需要先核对，不能直接创建新任务。完整规则见 [确认与幂等协议](docs/03-confirmation-idempotency.md)。
+wxview 使用本地缓存，不保证实时或手机端完整性。当前仅支持单账号目录，查询前后复核身份。不会自动初始化密钥、读取微信进程内存、启动无关服务或推进共享 checkpoint；缓存缺失时 wxview 自身可能按其规则建立缓存。媒体不读取，来源正文上限 12000 字。
 
-## 项目结构
+### 任务与记录
 
-```text
-PingTask/
-├── Package.swift
-├── Sources/PingTask/main.swift   # 原型 UI、状态管理、演示数据、自检入口
-├── scripts/package-app.sh        # 本机 .app 打包及 ad-hoc 签名
-├── docs/                        # 产品、架构、幂等、路线和验收
-├── AGENTS.md                    # AI 协作与开发约定
-└── README.md
-```
+- 松手不自动派发；明确确认才提交到本地模拟执行器。
+- 同一来源、动作 ID、执行器再次 Ping，打开已有记录并保留编辑；已移除项目选择和项目身份维度。
+- 活跃提交期间重复点击不会生成新一轮；续接必须添加新信息并明确确认。
+- 模板变更只影响新草稿；历史提示词快照不变。
+- 可以取消草稿或停止本地模拟。删除记录需要确认，独占截图移入废纸篓，共享截图保留；删除不代表取消远程任务。
+- 重启发现未结束的模拟执行时标记“待核对”，不自动重新提交。
 
-当前采用 SwiftUI + AppKit，无第三方依赖。源码为便于评审的单文件原型；真实接入时按 Capture、Resolver、SourceAdapter、TaskCoordinator、ExecutorAdapter 和 RecordStore 拆分，参见 [技术设计](docs/02-architecture.md)。
+轮盘的“继续推进”是可配置意图；当前真正的模拟续接在已有任务记录中操作。不能把模拟完成当成真实执行、代码改动或验证完成。
+
+## 数据与边界
+
+记录保存在 `~/Library/Application Support/PingTaskPrototype/state.json`，截图位于同目录的 `Captures/`。旧目录名为兼容既有数据保留。设置中可以打开数据目录。
+
+截图只在主动触发任务意图时进行；空闲不录屏、不运行 OCR、不轮询聊天。图像最长边 4096 像素，OCR 最多 400 行。macOS 14+ 使用 SCScreenshotManager，13 使用短时 SCStream 获取一帧。
+
+当前 JSON 存储仅适合单实例本地使用；真实执行器、事务 outbox、跨进程协调、远端幂等、完整消息前后文、飞书和钉钉适配尚未实现。权限、焦点、多屏/Retina、macOS 13 和真实微信命中率仍需实机验收。
 
 ## 开发与验证
 
@@ -106,23 +109,43 @@ codesign --verify --deep --strict dist/PingTask.app
 plutil -lint dist/PingTask.app/Contents/Info.plist
 ```
 
-自检使用临时目录，覆盖去重边界、编辑保留、双击提交保护、模板快照、取消后重建和重启恢复，不修改日常使用的记录。界面交互按 [验收清单](docs/05-prototype-checklist.md) 手工检查。
+测试使用临时存储与合成消息，覆盖身份、去重、编辑保留、提交保护、取消与删除、共享截图清理、wxview 协议和账号隔离、CLI 超时、手势状态、来源确认及真实 Vision 对合成图像的 OCR。不修改用户记录，不调用真实执行器。
 
-打包脚本生成当前机器架构的应用，不是 Universal 二进制；ad-hoc 签名仅用于本机开发，不等于 Developer ID 签名或公证。发布包、多架构构建和自动更新尚未配置。
+重新生成文档界面图（不执行屏幕捕获）：
 
-不要提交 `.build/`、`dist/`、真实截图、聊天记录、令牌或运行状态。现阶段 JSON 存储按单实例使用，不支持多实例并发写入。
+```sh
+swift build
+mkdir -p docs/images
+.build/debug/PingTask --render-desktop 4 docs/images/desktop.png
+.build/debug/PingTask --render-desktop 1 docs/images/intents.png
+.build/debug/PingTask --render-desktop 2 docs/images/tasks.png
+.build/debug/PingTask --render-desktop 3 docs/images/wechat.png
+.build/debug/PingTask --render-desktop 6 docs/images/settings.png
+```
 
-## 下一步
+提交图片前检查是否包含本机路径、账号或其他私人信息。渲染工具使用临时任务存储；连接路径和权限展示仍可能来自运行环境。
 
-1. 实现系统权限引导、全局轮盘和单次截图。
-2. 接入 wxview 消息定位及有范围的上下文读取。
-3. 完成 Codex 单项目闭环和生产级提交恢复。
-4. 扩展飞书、钉钉和 WorkBuddy。
+## 代码与设计
 
-完整优先级见 [功能清单与路线](docs/04-roadmap.md)。参与开发前请阅读 [AGENTS.md](AGENTS.md)。
+| 路径 | 职责 |
+|---|---|
+| `Sources/PingTask/main.swift` | 模型、Store、模拟执行、App 与命令行入口 |
+| `Capture/` | 全局输入、窗口截图、捕获协调、几何与自检 |
+| `Resolver/` | OCR 线索与微信候选匹配 |
+| `SourceAdapter/` | wxview CLI、边界检查和隔离测试 |
+| `Presentation/` | 应用导航、设置、任务、轮盘和特效 |
+| `Resources/` | lolPing PNG 和上游版权说明 |
+| `scripts/` | icns 生成和本机应用打包 |
 
-## 设计参考
+`Capture/` 至 `Resources/` 的目录简写均相对于 `Sources/PingTask/`。采用 Apple 原生框架，无第三方运行时依赖。
 
-借鉴 [lolPing](https://github.com/darrenprx/lolPing) 的按住、指向、松手和轮盘反馈交互。未复制其代码、游戏图标或音效；原型使用系统 SF Symbols 和自定义布局。
+- [产品设计](docs/01-product.md)
+- [技术设计](docs/02-architecture.md)
+- [确认与幂等协议](docs/03-confirmation-idempotency.md)
+- [功能路线](docs/04-roadmap.md)
+- [验证清单](docs/05-prototype-checklist.md)
+- [开发协作约定](AGENTS.md)
 
-框架与外部接口参考见技术设计。当前不包含开发者签名、公证或自动更新，打包脚本仅用于本机原型。
+## 素材来源
+
+交互和视觉参考 [lolPing](https://github.com/darrenprx/lolPing)，按用户要求使用其 PNG 图标，没有加入音效。上游源码为 MIT，但游戏图片不在 MIT 授权范围内；完整来源与版权边界见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
