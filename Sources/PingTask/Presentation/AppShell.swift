@@ -29,7 +29,7 @@ struct ContentView: View {
                         realSource = source; tab = 0
                         store.notice = "已选择微信消息，选择意图后创建草稿"
                     }
-                    case 6: AppSettingsView(desktop: desktop, openPractice: { realSource = nil; tab = 0 })
+                    case 6: AppSettingsView(store: store, desktop: desktop, openPractice: { realSource = nil; tab = 0 })
                     default: workspace
                     }
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -44,6 +44,22 @@ struct ContentView: View {
         .frame(minWidth: 1180, minHeight: 780)
         .preferredColorScheme(.dark).tint(accent)
         .onAppear { tab = initialTab }
+        .task {
+            if !store.isolated {
+                do {
+                    try await Task.detached { try CodexSettings.ensureDefaultWorkspace() }.value
+                    store.codexSettings.save()
+                } catch { store.notice = error.localizedDescription }
+            }
+            await store.refreshCodex()
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                guard !Task.isCancelled else { break }
+                if store.tasks.contains(where: { $0.codex != nil && $0.codex?.progress.exitCode == nil && $0.status != "状态待核对" }) {
+                    await store.refreshCodex(activeOnly: true)
+                }
+            }
+        }
         .onChange(of: desktop.navigation) { _ in tab = 4 }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in desktop.permissions() }
     }
@@ -107,7 +123,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("\(source.chat)  ·  \(source.sender)").font(.caption).foregroundStyle(.secondary)
                     ScrollView { Text(source.text).font(.title3).lineSpacing(5) }.frame(maxHeight: 100)
-                    Text(source.resolvedAnchor == nil ? "虚构消息 · 固定消息 ID · 非真实截图" : "真实本地缓存消息 · 手动定位 · 非截图 · 执行模拟").font(.caption2).foregroundStyle(.secondary)
+                    Text(source.resolvedAnchor == nil ? "虚构消息 · 固定消息 ID · 模拟执行" : "真实本地缓存消息 · 用户确认后交给执行器").font(.caption2).foregroundStyle(.secondary)
                 }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 16))
                 Text("02  选择 Ping 意图").font(.headline)
@@ -115,7 +131,7 @@ struct ContentView: View {
                 Text("点击动作，或从中心按住拖向动作后松手。\n重复选择同一动作，可验证草稿合并。")
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("执行器", selection: $executor) {
-                    Text("Codex（模拟）").tag("Codex")
+                    Text(realSource == nil ? "Codex（模拟）" : "Codex CLI").tag("Codex")
                     Text("WorkBuddy（模拟）").tag("WorkBuddy")
                 }
             } }.frame(width: 420)
@@ -194,6 +210,9 @@ struct ContentView: View {
                 Text(task.original).padding(12).frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 10))
                 Text("执行器 · \(task.executor)").font(.callout.bold())
+                if !store.isSimulation(task), task.executor == "Codex" {
+                    CodexTaskView(store: store, task: task)
+                }
                 Text("本次提示词快照").font(.headline)
                 if task.status == "待确认" {
                     TextEditor(text: taskText(task.id, \.promptSnapshot)).font(.system(size: 13)).scrollContentBackground(.hidden)
@@ -205,11 +224,13 @@ struct ContentView: View {
                 Text(task.status == "待确认" ? "补充说明" : "新增信息 · 用于下一轮").font(.headline)
                 TextEditor(text: taskText(task.id, \.note)).font(.system(size: 13)).scrollContentBackground(.hidden)
                     .frame(height: 64).padding(12).background(AppStyle.surface, in: RoundedRectangle(cornerRadius: 10))
-                    .disabled(task.status == "模拟执行中" || task.status == "已取消" || task.status == "待核对")
+                    .disabled(task.status != "待确认" && task.status != "模拟完成")
 
                 HStack {
                     if task.status == "待确认" {
-                        Button("确认提交（模拟）") { store.submit(task.id) }.buttonStyle(.borderedProminent).tint(accent).disabled(!Identity.canSubmit(task))
+                        Button(store.isSimulation(task) ? "确认提交（模拟）" : "确认交给 Codex CLI") { store.submit(task.id) }
+                            .buttonStyle(.borderedProminent).tint(accent)
+                            .disabled(!Identity.canSubmit(task) || store.codexBusy.contains(task.id) || (!store.isSimulation(task) && task.executor != "Codex"))
 
                     } else if task.status == "模拟完成" {
                         Button("确认补充并继续（模拟）") { store.submit(task.id, continuing: true) }
@@ -230,6 +251,7 @@ struct ContentView: View {
                         .font(.caption2.monospaced()).foregroundStyle(.secondary)
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
+                .disabled(store.codexBusy.contains(task.id))
         }
     }
 

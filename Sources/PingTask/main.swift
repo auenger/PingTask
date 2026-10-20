@@ -58,6 +58,7 @@ struct TaskRecord: Codable, Identifiable {
     var status = "待确认"
     var revision = 0
     var operationID: String?
+    var codex: CodexLink? = nil
     var events: [String] = []
     var updated = Date()
 }
@@ -89,9 +90,14 @@ struct SavedState: Codable {
     @Published var tasks: [TaskRecord] = []
     @Published var selected: UUID?
     @Published var notice = "就绪 · 截图与任务记录仅保存在本机"
+    @Published var codexSettings = CodexSettings.saved
+    @Published var codexBusy = Set<UUID>()
+    var refreshingCodex = false
+    let isolated: Bool
     private let file: URL
 
     init(fileURL: URL? = nil) {
+        isolated = fileURL != nil
         file = fileURL ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("PingTaskPrototype/state.json")
         guard FileManager.default.fileExists(atPath: file.path) else { return }
@@ -133,7 +139,7 @@ struct SavedState: Codable {
                                   promptSnapshot: action.prompt, executor: executor)
             task.evidence = source.evidence
             if let desktopCapture { task.captures = [desktopCapture]; task.requiresSourceConfirmation = true }
-            task.events = [source.resolvedAnchor == nil ? "已捕获模拟消息，创建待确认草稿" : "已选择真实微信消息，创建待确认草稿；执行器仍为模拟"]
+            task.events = [source.resolvedAnchor == nil ? "已捕获模拟消息，创建待确认草稿" : "已选择真实微信消息，创建待确认草稿；尚未提交执行"]
             if desktopCapture != nil { task.events = ["已保存真实窗口截图与意图；来源待核对，未派发"] }
             tasks.insert(task, at: 0)
             selected = task.id
@@ -176,6 +182,11 @@ struct SavedState: Codable {
 
     func submit(_ id: UUID, continuing: Bool = false) {
         guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
+        if !isSimulation(tasks[index]) {
+            guard !continuing else { notice = "请打开已关联的 Codex CLI 对话继续推进"; return }
+            submitCodex(id)
+            return
+        }
         guard continuing ? Identity.canContinue(tasks[index]) : Identity.canSubmit(tasks[index]) else { return }
         let prior = tasks[index]
         tasks[index].revision += 1
@@ -201,7 +212,7 @@ struct SavedState: Codable {
     }
 
     @discardableResult func cancel(_ id: UUID) -> Bool {
-        guard let i = tasks.firstIndex(where: { $0.id == id }),
+        guard !codexBusy.contains(id), let i = tasks.firstIndex(where: { $0.id == id }),
               ["待确认", "模拟执行中"].contains(tasks[i].status) else { return false }
         let prior = tasks[i]
         tasks[i].status = "已取消"
@@ -214,7 +225,11 @@ struct SavedState: Codable {
     @discardableResult func deleteTask(_ id: UUID, trash: (URL) throws -> Void = {
         if FileManager.default.fileExists(atPath: $0.path) { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }
     }) -> Bool {
-        guard let removed = tasks.first(where: { $0.id == id }) else { return false }
+        guard !codexBusy.contains(id), let removed = tasks.first(where: { $0.id == id }) else { return false }
+        guard removed.codex == nil || removed.codex?.progress.exitCode != nil else {
+            notice = "请先在 Codex CLI 核对执行结束，再删除本地记录"
+            return false
+        }
         let prior = tasks, selection = selected
         tasks.removeAll { $0.id == id }
         if selected == id { selected = tasks.first?.id }
@@ -255,7 +270,7 @@ struct PingTaskApp: App {
             Button("桌面 Ping") {
                 desktop.showReview()
             }
-            Text("执行器未连接")
+            Text("Codex CLI · tmux")
             Divider()
             Button("退出") { NSApp.terminate(nil) }
         } label: {
@@ -311,7 +326,47 @@ struct PingTaskApp: App {
     print("PASS: identity boundaries, draft merge, edit preservation, double-submit guard, crash recovery, template snapshots, cancel/recapture, continuation guards, revision IDs")
 }
 
-if CommandLine.arguments.contains("--self-test") {
+if let index = CommandLine.arguments.firstIndex(of: "--codex-worker"), CommandLine.arguments.count > index + 1 {
+    do { try CodexRunner.worker(directory: URL(fileURLWithPath: CommandLine.arguments[index + 1])) }
+    catch { fputs("PingTask worker: \(error.localizedDescription)\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--process-environment-check") {
+    do {
+        let inherited = try CLIProcess.run(path: "/usr/bin/printenv", arguments: ["HOME"])
+        precondition(String(decoding: inherited, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) == ProcessInfo.processInfo.environment["HOME"])
+        let overridden = try CLIProcess.run(path: "/usr/bin/printenv", arguments: ["HOME"], environment: ["HOME": "/fixture-home"])
+        precondition(String(decoding: overridden, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) == "/fixture-home")
+        let permission = CLIProcess.failureMessage(stderr: Data("error: /private/account: operation not permitted".utf8), exitCode: 1, command: "me")
+        precondition(permission.contains("macOS 拒绝") && !permission.contains("/private/account"))
+        print("PASS: inherited HOME, explicit environment override, sanitized error classification")
+    } catch { fputs("Environment check failed\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--wxview-connection-check") {
+    let path = UserDefaults.standard.string(forKey: "wxviewPath") ?? ""
+    do {
+        let adapter = WxviewAdapter(path: path)
+        _ = try adapter.execute(path, ["version"])
+        print("wxview version: OK")
+        let account = try adapter.identity()
+        print("wxview identity: OK")
+        try adapter.checkSingleAccount(account)
+        _ = try adapter.checked(account, args: ["cache", "status", "--format", "json"])
+        print("wxview cache: OK")
+    } catch {
+        fputs("\((error as? WxFailure)?.message ?? "wxview 账号目录或协议检查失败")\n", stderr)
+        exit(1)
+    }
+} else if CommandLine.arguments.contains("--codex-connection-check") {
+    do {
+        try CodexSettings.ensureDefaultWorkspace()
+        var settings = CodexSettings.saved
+        let paths = CodexSettings.discover()
+        if settings.executable.isEmpty { settings.executable = paths.0 ?? "" }
+        print(try settings.checkConnection())
+        print("Default workspace: \(CodexSettings.defaultWorkspace.path)")
+    } catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--codex-check") {
+    do { try runCodexChecks() }
+    catch { fputs("Codex check: \(error.localizedDescription)\n", stderr); exit(1) }
+} else if CommandLine.arguments.contains("--self-test") {
     MainActor.assumeIsolated {
         runChecks()
         do { try runWxviewChecks(); try runDesktopChecks() } catch { fatalError("wxview fixture checks failed: \(error)") }

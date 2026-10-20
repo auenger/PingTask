@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 
 struct AppSettingsView: View {
+    @ObservedObject var store: Store
     @ObservedObject var desktop: DesktopPingController
     let openPractice: () -> Void
     var body: some View {
@@ -28,11 +29,7 @@ struct AppSettingsView: View {
                         Button("在 Finder 中显示当前应用") { NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL]) }.padding(.top, 6)
                     }.font(.callout)
                 }.appSurface()
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("任务执行", systemImage: "terminal").font(.headline)
-                    Text("Codex / WorkBuddy 尚未连接").font(.callout.weight(.medium))
-                    Text("现在可以捕获、整理和确认草稿。提交只运行本地模拟，不会修改代码或派发外部任务。").font(.callout).foregroundStyle(.secondary)
-                }.appSurface()
+                CodexSettingsView(store: store).appSurface()
                 VStack(alignment: .leading, spacing: 14) {
                     Label("本地数据", systemImage: "internaldrive").font(.headline)
                     Text("截图和任务记录保存在这台 Mac。删除记录时，未被其他任务引用的截图会移入废纸篓。").font(.callout).foregroundStyle(.secondary)

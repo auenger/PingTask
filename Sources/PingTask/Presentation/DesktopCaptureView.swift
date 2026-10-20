@@ -30,6 +30,7 @@ struct CapturePreview: View {
 }
 
 struct DesktopCaptureView: View {
+    @State private var contextMessage: WxMessage?
     @ObservedObject var model: DesktopPingController
     @ObservedObject var store: Store
     var openSettings: () -> Void = {}
@@ -97,6 +98,7 @@ struct DesktopCaptureView: View {
                                             Text(message.text).font(.callout).textSelection(.enabled)
                                             Button("确认是这条消息") { model.accept(message) }
                                                 .disabled(!pending)
+                                            Button("查看附近上下文") { contextMessage = message }.disabled(!pending)
                                         }.frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                 }
@@ -159,6 +161,13 @@ struct DesktopCaptureView: View {
             }.padding(28)
         }
         .onAppear { model.permissions() }
+        .sheet(item: $contextMessage) { message in
+            if let account = model.account {
+                WxContextView(path: UserDefaults.standard.string(forKey: "wxviewPath") ?? "", account: account, message: message) { source in
+                    model.acceptContext(source, anchor: message)
+                }
+            }
+        }
     }
     private var pending: Bool { store.tasks.first(where: { $0.id == model.taskID }) .map { $0.requiresSourceConfirmation == true && $0.status == "待确认" } == true }
 }

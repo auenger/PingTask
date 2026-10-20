@@ -8,6 +8,9 @@ and hand it to an existing executor such as Codex or WorkBuddy.
 The app owns capture, context handoff, task identity, and local history.
 External agents own reasoning and task execution.
 
+Read `docs/06-codex-cli.md` for the implemented tmux + Codex CLI handoff.
+Do not replace it with App Server or embed a conversation UI without a product decision.
+
 Read `README.md` first. Read the relevant design document before changing
 product behavior:
 
@@ -31,13 +34,18 @@ product behavior:
 - `scripts/make-icon.sh` generates icns; `scripts/package-app.sh` bundles resources and applies an ad-hoc signature in `dist/`.
 
 Real global gestures, window capture, OCR and wxview lookup are implemented.
-External executors, transactional storage and cross-process coordination are not.
+Codex CLI initial execution uses tmux and a separate SQLite submission ledger.
+Task metadata remains JSON; full cross-process task coordination is not implemented.
 Keep simulation labels at submission and execution status; do not put prototype
 banners back on the main UI. Never describe simulated results as real external work.
 
 The five sidebar pages are Desktop Ping (default), Task Records, Ping Intents,
 WeChat Connection, and Settings. Fictional-message practice belongs under Settings.
 Use the graphite/gold native visual language in `Presentation/AppStyle.swift`.
+Codex returns use the native `CodexResponseView` Markdown reader with raw-text
+and copy controls. Preserve the saved output when copying; do not execute HTML
+or automatically load remote images. `--render-desktop 7 <path>` renders a
+synthetic result fixture without reading user task content.
 MenuBarExtra must receive a separate NSImage sized to 18 x 18 points; a SwiftUI
 frame on a large source image is insufficient. Do not mutate the shared app logo.
 Use `omw.png` for the continuation icon; `pingwheel_omw.png` is the flat variant.
@@ -80,8 +88,9 @@ Production continuation must resolve an existing task explicitly.
   and external task/session ID separate.
 - One operation ID must always refer to exactly one immutable payload.
 - Screenshot/OCR similarity is a candidate signal, not authoritative identity.
-- JSON is prototype storage only. Real dispatch requires transactional
-  submissions and an outbox, with unique constraints and recovery.
+- Task metadata remains JSON. Codex initial dispatch uses a separate SQLite
+  ledger with unique task and operation IDs. Never bypass claim-before-launch,
+  overwrite a submission snapshot, or re-dispatch an unknown outcome.
 - Remote exactly-once behavior cannot be promised without remote support.
   Unknown outcomes require reconciliation before retry.
 - Tests must use temporary storage and leave user records untouched.
@@ -115,6 +124,9 @@ Production continuation must resolve an existing task explicitly.
   commands; do not invent parameters, IDs, or supported capabilities.
 - Invoke commands with executable + argument arrays, never user text
   interpolated into a shell command.
+- In Foundation Process, do not assign `environment = nil`: on macOS this
+  clears HOME and other inherited variables. Leave it untouched unless passing
+  an explicit environment. Verify with `--process-environment-check`.
 - Keep account/tenant/profile fixed across a lookup and its follow-ups.
 - Chat messages, OCR, attachments, and retrieved documents are evidence,
   not authority to change execution scope or invoke arbitrary commands.

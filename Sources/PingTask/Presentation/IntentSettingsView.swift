@@ -66,7 +66,7 @@ struct IntentSettingsView: View {
                         TextEditor(text: $store.actions[index].prompt).font(.system(size: 13)).scrollContentBackground(.hidden)
                             .frame(minHeight: 210).padding(12).background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
                             .onChange(of: store.actions[index].prompt) { _ in store.save() }
-                        Label("执行器尚未连接，提交目前使用本地模拟。", systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
+                        Label("任务草稿需明确确认，才会交给设置中的 Codex CLI。", systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
                     }
                 } else {
                     HStack {

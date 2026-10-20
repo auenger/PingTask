@@ -250,11 +250,19 @@ import ApplicationServices
         source.evidence = (source.evidence ?? "") + "\n通过桌面 OCR 检索，用户已核对候选；搜索结果不等于完整前后上下文。"
         guard store.resolveDesktop(id, source: source) else { status = "无法更新来源，请检查记录状态或本地存储"; return }
         taskID = store.selected
-        status = "已确认真实消息来源；草稿等待明确提交，执行仍为模拟。"
+        status = "已确认真实消息来源；草稿等待明确提交。"
+    }
+    func acceptContext(_ source: SourceMessage, anchor: WxMessage) {
+        guard !busy, let id = taskID, let account, let page = results,
+              page.items.contains(where: { $0.id == anchor.id && $0.chatUsername == anchor.chatUsername }),
+              source.resolvedAnchor == Identity.digest(["wechat", account.key, anchor.chatUsername, anchor.id]) else { return }
+        guard store.resolveDesktop(id, source: source) else { status = "无法保存上下文，请核对草稿状态"; return }
+        taskID = store.selected
+        status = "已确认原消息及附近上下文；可到任务记录提交。"
     }
     func keepScreenshot() {
         guard !busy, let id = taskID else { return }
         guard store.keepDesktopScreenshot(id) else { status = "无法更新截图草稿，请检查记录状态或本地存储"; return }
-        status = "保留为截图来源草稿；未定位微信会话，执行仍为模拟。"
+        status = "保留为截图来源草稿；未定位微信会话，等待明确提交。"
     }
 }

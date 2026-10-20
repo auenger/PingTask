@@ -157,7 +157,37 @@ import Vision
         store.capture(SourceMessage.examples[0], action: store.actions[0], executor: "Codex")
     }
     let model = DesktopPingController(store: store)
-    let content = ContentView(store: store, desktop: model, initialTab: tab).frame(width: 1280, height: 860)
+    let content = Group {
+        if tab == 7 {
+            ScrollView {
+                CodexResponseView(markdown: """
+                # 执行结果预览
+                已完成 **任务详情** 的展示调整，保留 `session ID` 以继续对话。
+
+                ## 本次变更
+                - 支持 Markdown 预览与原文切换
+                - [x] 全文复制与代码块复制
+                - [ ] 在实际任务中确认交互
+
+                > 此处为虚构输出，只用于界面预览。
+
+                ```swift
+                let message = "Hello, PingTask"
+                print(message)
+                ```
+
+                | 项目 | 状态 |
+                | --- | --- |
+                | 结果展示 | 已实现 |
+                | 实际任务验收 | 待确认 |
+
+                支持 **加粗**、*强调*、`行内代码` 与 [链接](https://example.com)。
+                """).padding(28)
+            }.frame(width: 920, height: 860).background(AppStyle.canvas).preferredColorScheme(.dark)
+        } else {
+            ContentView(store: store, desktop: model, initialTab: tab)
+        }
+    }.frame(width: 1280, height: 860)
     let hosting = NSHostingView(rootView: content)
     let window = NSWindow(contentRect: CGRect(x: -20000, y: -20000, width: 1280, height: 860),
                           styleMask: [.borderless], backing: .buffered, defer: false)

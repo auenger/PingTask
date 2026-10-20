@@ -24,14 +24,14 @@ struct TaskRecordControls: View {
                 if task.status == "已取消" { Text("已取消").foregroundStyle(.secondary) }
             }
         }
-        .disabled(desktop.busy)
+        .disabled(desktop.busy || store.codexBusy.contains(taskID))
         .alert("删除这条 Ping 记录？", isPresented: $confirmingDelete) {
             Button("保留", role: .cancel) {}
             Button("删除", role: .destructive) {
                 if store.deleteTask(taskID) { desktop.forgetDeletedTask(taskID) }
             }
         } message: {
-            Text("本地记录将移除，独占截图移到废纸篓。正在进行的本地模拟会停止；删除记录不代表取消远程任务。")
+            Text("本地记录将移除，独占截图移到废纸篓。Codex 的提交快照、日志和会话保留，删除记录不会取消 Codex 执行。")
         }
     }
 }

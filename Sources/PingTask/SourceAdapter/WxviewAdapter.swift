@@ -8,20 +8,25 @@ struct WxFailure: LocalizedError {
 
 // Runs only off the main actor. No shell, no raw stderr in UI/logs, bounded output and time.
 enum CLIProcess {
-    static func run(path: String, arguments: [String], timeout: TimeInterval = 30) throws -> Data {
+    static func run(path: String, arguments: [String], timeout: TimeInterval = 30, environment: [String: String]? = nil) throws -> Data {
         guard path.hasPrefix("/"), FileManager.default.isExecutableFile(atPath: path) else {
             throw WxFailure(message: "请选择可执行的 wxview 绝对路径")
         }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
         process.arguments = arguments
+        // On macOS, assigning nil clears the child's environment (including HOME).
+        // Leave this property untouched unless the caller supplies an override.
+        if let environment { process.environment = environment }
         let pipe = Pipe()
         process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
+        let errorPipe = Pipe()
+        process.standardError = errorPipe
         let finished = DispatchSemaphore(value: 0)
         process.terminationHandler = { _ in finished.signal() }
         try process.run()
         let buffer = OutputBuffer()
+        let errorBuffer = OutputBuffer()
         let reader = DispatchGroup()
         reader.enter()
         DispatchQueue.global().async {
@@ -30,16 +35,45 @@ enum CLIProcess {
                 if !buffer.append(chunk) { kill(process.processIdentifier, SIGKILL); break }
             }
         }
+        reader.enter()
+        DispatchQueue.global().async {
+            defer { reader.leave() }
+            while let chunk = try? errorPipe.fileHandleForReading.read(upToCount: 4096), !chunk.isEmpty {
+                // Drain everything but retain only a small prefix for classification.
+                errorBuffer.data.append(chunk.prefix(max(0, 8192 - errorBuffer.data.count)))
+            }
+        }
         let timedOut = finished.wait(timeout: .now() + timeout) == .timedOut
         if timedOut { kill(process.processIdentifier, SIGKILL); process.waitUntilExit() }
         reader.wait()
         try? pipe.fileHandleForReading.close()
+        try? errorPipe.fileHandleForReading.close()
         guard !timedOut else { throw WxFailure(message: "wxview 查询超时；未自动重试") }
         guard !buffer.overflow else { throw WxFailure(message: "wxview 输出超过 8 MB，请缩小查询范围") }
         guard process.terminationStatus == 0 else {
-            throw WxFailure(message: "wxview 命令失败（退出码 \(process.terminationStatus)）；请检查本机缓存与授权，不会自动初始化")
+            throw WxFailure(message: failureMessage(stderr: errorBuffer.data, exitCode: process.terminationStatus, command: arguments.first ?? ""))
         }
         return buffer.data
+    }
+    static let dataAccessMessage = "macOS 拒绝读取微信数据。辅助功能和屏幕录制不包含这项权限；请在系统设置的“完整磁盘访问权限”中授权当前 PingTask，再退出并重新打开。"
+    static func failureMessage(stderr: Data, exitCode: Int32, command: String) -> String {
+        let detail = String(decoding: stderr, as: UTF8.self).lowercased()
+        let stage = ["version": "版本检查", "me": "账号识别", "cache": "缓存检查", "contacts": "会话查询",
+                     "messages": "消息读取", "search": "消息检索"][command] ?? "命令执行"
+        let reason: String
+        if detail.contains("$home is not defined") {
+            reason = "子进程缺少 HOME 环境变量，无法定位微信目录；请重新打开最新版 PingTask。"
+        } else if detail.contains("operation not permitted") || detail.contains("permission denied") {
+            reason = dataAccessMessage
+        } else if detail.contains("no wechat contact database") || detail.contains("detect wechat data root") {
+            reason = "未找到可读取的微信数据目录；请确认这台 Mac 的微信已登录并生成本地数据。"
+        } else if detail.contains("executable file not found") {
+            reason = "运行依赖未找到，请检查本机命令环境。"
+        } else {
+            reason = "wxview 未成功完成，请检查本地缓存状态；不会自动初始化密钥。"
+        }
+        // Never surface raw stderr: it may contain account paths, queries or private content.
+        return "\(stage)失败（退出码 \(exitCode)）：\(reason)"
     }
     private final class OutputBuffer: @unchecked Sendable {
         var data = Data()
@@ -90,6 +124,7 @@ struct WxMessage: Decodable, Identifiable {
     let type: Int
     let content: String
     let contentDetail: [String: String]?
+    var createTime: Int? = nil
     var text: String {
         // Never persist raw XML, URLs, local media paths, or CDN secrets.
         if let text = contentDetail?["text"], !text.isEmpty, !text.contains("<") { return String(text.prefix(12000)) }

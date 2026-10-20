@@ -4,6 +4,9 @@ import PackageDescription
 let package = Package(
     name: "PingTask",
     platforms: [.macOS(.v13)],
-    targets: [.executableTarget(name: "PingTask", resources: [.process("Resources")])],
+    targets: [
+        .systemLibrary(name: "CSQLite"),
+        .executableTarget(name: "PingTask", dependencies: ["CSQLite"], resources: [.process("Resources")])
+    ],
     swiftLanguageModes: [.v5]
 )

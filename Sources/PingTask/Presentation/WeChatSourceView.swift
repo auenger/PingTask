@@ -72,6 +72,7 @@ import AppKit
 }
 
 struct WeChatSourceView: View {
+    @State private var contextMessage: WxMessage?
     @ObservedObject var model: WeChatSourceModel
     let select: (SourceMessage) -> Void
     var body: some View {
@@ -116,6 +117,7 @@ struct WeChatSourceView: View {
                                 Text("\(message.fromUsername) · \(message.time)").font(.caption).foregroundStyle(.secondary)
                                 Text(message.text).lineLimit(5)
                                 Button("选为 Ping 来源") { select(message.source(account: account, page: page, readAt: model.readAt)) }
+                                Button("查看附近上下文") { contextMessage = message }
                             }.padding(.vertical, 5)
                         }
                     } else {
@@ -130,6 +132,19 @@ struct WeChatSourceView: View {
                 if model.busy { ProgressView().controlSize(.small) }
                 Text(model.status).font(.caption).textSelection(.enabled)
             }
+            if model.status.contains("macOS 拒绝读取微信数据") {
+                HStack {
+                    Button("打开数据访问权限设置") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
+                    }
+                    Button("显示当前 PingTask") { NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL]) }
+                }
+            }
         }.padding(28).textFieldStyle(.roundedBorder).disabled(model.busy)
+            .sheet(item: $contextMessage) { message in
+                if let account = model.account {
+                    WxContextView(path: model.path, account: account, message: message, confirm: select)
+                }
+            }
     }
 }
