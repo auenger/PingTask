@@ -4,7 +4,7 @@
 
 一个使用 SwiftUI + AppKit 构建的原生 macOS 应用。按住 Alt / Ctrl，移动指针选择 Ping 意图，松手保存截图草稿；也可以只播放一个短暂的特效。
 
-已实现全局轮盘、窗口截图、Vision OCR、wxview 消息定位和本地任务管理。**已接入 tmux + Codex CLI：真实来源确认后可启动执行并找回 session。WorkBuddy 尚未接入；虚构消息练习仍为模拟。**
+已实现全局轮盘、窗口截图、Vision OCR、wxview 消息定位和本地任务管理。**已接入 tmux + Codex CLI：真实来源确认后可启动执行并找回 session。WorkBuddy 已加入实验性 CLI + IPC 适配；虚构消息练习仍为模拟。**
 
 ![桌面 Ping](docs/images/desktop.png)
 
@@ -21,6 +21,8 @@
 | 设置 | 切换 Alt / Ctrl，管理系统权限、查看执行器状态和本地数据 |
 
 金色问号用于应用 Logo、Dock 和菜单栏；菜单栏使用独立的 **18 × 18 pt** 图标。界面采用石墨灰与金色，默认进入桌面 Ping。虚构消息的交互练习放在设置底部。
+
+设置 → 应用显示可开启“仅在菜单栏显示（隐藏 Dock 图标）”，即时生效并记住选择。关闭窗口后仍在后台运行，可从顶部小图标的“打开 PingTask”重新打开；关闭此选项恢复 Dock 图标。
 
 <details>
 <summary>Ping 意图库、图片选择与轮盘</summary>
@@ -79,13 +81,19 @@ open dist/PingTask.app
 
 ### 微信连接
 
-1. 选择本机 `wxview` 可执行文件，点击“检查连接”。已对照的 CLI 协议版本为 0.4.0。
-2. 查找群聊或联系人，明确选择会话和日期。手动读取指定日期最早的 100 条消息，有截断时显示提示，不自动翻页。
+1. 选择支持 `messages --order / --cursor` 的本机 `wxview`，启动时自动加载最近会话，不逐个查询聊天历史。已对照本机 `0.4.0-pagination-dev`；旧 CLI 提示升级。
+2. 最近会话按最新消息时间倒序，每页 100 个，显示时间、摘要和未读数量；可筛选联系人/群聊或切换通讯录。缓存变化时会话位置可能变化，按 ID 去重，刷新从第一页重排。选中后读取范围内最新 100 条消息，“更早的 100 条”使用固定时间范围的游标继续。
 3. 可直接选为 Ping 来源，或点击“查看附近上下文”：读取该会话目标消息前后 15 分钟内最多 100 条，核对锚点前后各最多 5 条后再确认。仅保存确认的材料，其他候选不落盘。
 
 桌面自动定位只适用于微信窗口（`com.tencent.xinWeChat`）。默认检索最近 **30 天**，每次最多 **20 条**消息，可修改日期范围（最长 366 天）。唯一标题候选可以继续自动检索，但最终消息始终由用户核对；OCR 相似度不是权威消息身份。
 
-wxview 使用本地缓存，不保证实时或手机端完整性。当前仅支持单账号目录，查询前后复核身份。不会自动初始化密钥、读取微信进程内存、启动无关服务或推进共享 checkpoint；缓存缺失时 wxview 自身可能按其规则建立缓存。媒体不读取，来源正文上限 12000 字。
+wxview 使用本地缓存，不保证实时或手机端完整性。当前仅支持单账号目录，查询前后复核身份。不会自动初始化密钥、读取微信进程内存、启动无关服务或推进共享 checkpoint；缓存缺失时 wxview 自身可能按其规则建立缓存。来源正文上限 12000 字。
+
+本机可用的图片按需加载缩略图，图片和文件支持 Quick Look 预览、Finder 定位。仅允许读取当前账号目录或缓存中的普通文件，单个附件最多 32 MB；找不到本地文件时显示提示，不自动从 CDN 下载。wxview 部分文件定位依赖候选匹配，请先预览核对，再勾选“附带给 Agent 分析”并选择 Ping 意图。
+
+![最近会话与本机附件（合成演示数据）](docs/images/wechat-media.png)
+
+创建草稿时保存独立附件副本和 SHA-256，提交前再次校验，并把附件复制进本次提交目录；提示词列出文件清单和分析要求。Codex 图片转换为 PNG 提供视觉输入，WorkBuddy 通过额外目录访问读取附件，图片理解尚未验证。附件内容只作为资料，不作为执行指令。重复 Ping 保留已有附件；删除任务清理独占副本，共享文件保留，已提交的执行快照仍保留。
 
 ### 任务与记录
 
@@ -111,13 +119,27 @@ wxview 使用本地缓存，不保证实时或手机端完整性。当前仅支�
 
 详见 [CLI 交接实现与手动回归](docs/06-codex-cli.md)。
 
+## 飞书 / 钉钉窗口来源
+
+已加入飞书、Lark、钉钉窗口识别，以及飞书 CLI 路径/profile 设置。飞书可按精确群名或真实 chat_id 读取指定日期最近 50 条，由用户确认消息并附带本页附近上下文；不会自动提交。明确识别为输入控件时停止自动查询。钉钉消息适配仍待本机 dws 契约校验，目前保留截图草稿。详见 [接入状态与边界](docs/08-enterprise-chat.md)。
+
+![飞书来源核对面板（合成消息）](docs/images/enterprise-chat.png)
+
+这是来源核对面板的独立预览，不代表真实飞书登录或消息读取已通过验收。
+
 ## 数据与边界
+
+### 本轮开发状态
+
+设置中可检查 WorkBuddy 桌面连接，Ping 意图可选择 Codex / WorkBuddy、自动上下文与自动提交，两个自动开关默认关闭。WorkBuddy 默认启用读取工具，可开启 Write / Edit，返回结果支持 Markdown 预览和复制；桌面任务列表、续聊及图片视觉输入尚未验证。详见 [WorkBuddy 接入与验证边界](docs/07-workbuddy.md)。
+
+下文及前文的人工确认流程是默认行为；微信显式开启意图自动提交后采用预先授权，唯一可靠匹配才提交，歧义保留草稿，已有任务不重复派发。微信页已对接 wxview 倒序游标分页，真实聊天与 GUI 完整流程仍待验收。
 
 记录保存在 `~/Library/Application Support/PingTaskPrototype/state.json`，截图位于同目录的 `Captures/`。旧目录名为兼容既有数据保留。设置中可以打开数据目录。
 
 截图只在主动触发任务意图时进行；空闲不录屏、不运行 OCR、不轮询聊天。图像最长边 4096 像素，OCR 最多 400 行。macOS 14+ 使用 SCScreenshotManager，13 使用短时 SCStream 获取一帧。
 
-任务和意图仍用 JSON，适合单实例本地使用；Codex 初次提交单独使用 SQLite 事务占用与不可变快照。尚无远端幂等承诺、外部续聊状态同步、完整历史上下文及飞书和钉钉适配。权限、焦点、多屏/Retina、macOS 13 和真实微信命中率仍需实机验收。
+任务和意图仍用 JSON，适合单实例本地使用；Codex 初次提交单独使用 SQLite 事务占用与不可变快照。尚无远端幂等承诺、外部续聊状态同步、完整历史上下文及完整的企业聊天适配（飞书已实现人工确认流程，钉钉仅读取窗口身份）。权限、焦点、多屏/Retina、macOS 13 和真实微信命中率仍需实机验收。
 
 ## 开发与验证
 
@@ -142,10 +164,12 @@ mkdir -p docs/images
 .build/debug/PingTask --render-desktop 4 docs/images/desktop.png
 .build/debug/PingTask --render-desktop 1 docs/images/intents.png
 .build/debug/PingTask --render-desktop 2 docs/images/tasks.png
-.build/debug/PingTask --render-desktop 3 docs/images/wechat.png
-.build/debug/PingTask --render-desktop 6 docs/images/settings.png
+.build/debug/PingTask --render-desktop 3 -wxviewPath /example/wxview docs/images/wechat.png
+.build/debug/PingTask --render-desktop 6 -larkPath /example/lark-cli -larkProfile demo-profile -dwsPath /example/dws docs/images/settings.png
 .build/debug/PingTask --render-desktop 7 docs/images/codex-response.png
 .build/debug/PingTask --render-desktop 8 docs/images/artwork.png
+.build/debug/PingTask --render-desktop 9 docs/images/wechat-media.png
+.build/debug/PingTask --render-desktop 10 docs/images/enterprise-chat.png
 .build/debug/PingTask --render-wheel docs/images/wheel.png
 ```
 
@@ -159,19 +183,21 @@ mkdir -p docs/images
 | `Capture/` | 全局输入、窗口截图、捕获协调、几何与自检 |
 | `Resolver/` | OCR 线索与微信候选匹配 |
 | `Intent/` | 意图库、轮盘启用与排序、素材目录、受限的本机图片导入 |
-| `Executor/` | Codex CLI、tmux、SQLite 提交占用、事件与 session 关联 |
-| `SourceAdapter/` | wxview CLI、边界检查和隔离测试 |
+| `Executor/` | Codex / WorkBuddy、tmux、SQLite 提交占用、事件与 session 关联 |
+| `SourceAdapter/` | wxview / 飞书 CLI、最近会话、附件、边界检查和隔离测试 |
 | `Presentation/` | 应用导航、设置、任务、轮盘和特效 |
 | `Resources/` | lolPing 图片、素材目录和上游版权说明 |
 | `scripts/` | icns 生成和本机应用打包 |
 
-`Capture/` 至 `Resources/` 的目录简写均相对于 `Sources/PingTask/`。采用 Apple 原生框架，无第三方运行时依赖。
+`Capture/` 至 `Resources/` 的目录简写均相对于 `Sources/PingTask/`。界面采用 Apple 原生框架；Codex 依赖本机 CLI 与 tmux，实验性 WorkBuddy 适配另外依赖 Python 3。
 
 - [产品设计](docs/01-product.md)
 - [技术设计](docs/02-architecture.md)
 - [确认与幂等协议](docs/03-confirmation-idempotency.md)
 - [功能路线](docs/04-roadmap.md)
 - [验证清单](docs/05-prototype-checklist.md)
+- [WorkBuddy 接入](docs/07-workbuddy.md)
+- [飞书 / 钉钉接入边界](docs/08-enterprise-chat.md)
 - [开发协作约定](AGENTS.md)
 
 ## 素材来源

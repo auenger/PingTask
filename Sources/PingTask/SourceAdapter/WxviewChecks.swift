@@ -1,6 +1,8 @@
 import Foundation
 
 @MainActor func runWxviewChecks() throws {
+    try runWxBrowsingChecks()
+    try runWxMediaChecks()
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("PingTask-wx-tests-\(UUID())")
     defer { try? FileManager.default.removeItem(at: directory) }
     let dataDir = directory.appendingPathComponent("account-a/db_storage")

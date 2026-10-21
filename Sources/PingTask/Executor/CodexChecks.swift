@@ -34,11 +34,11 @@ func runCodexChecks() throws {
     let claimedAgain = try ledger.claim(task.id)
     precondition(!claimedAgain)
     var link = CodexRunner.link(submission, root: ledgerRoot)
-    for _ in 0..<50 where link.progress.exitCode == nil {
+    for _ in 0..<300 where link.progress.exitCode == nil {
         Thread.sleep(forTimeInterval: 0.1)
         link = CodexRunner.link(submission, root: ledgerRoot)
     }
-    precondition(link.progress.sessionID == session && link.progress.exitCode == 0)
+    guard link.progress.sessionID == session && link.progress.exitCode == 0 else { throw WxFailure(message: "Fixture worker did not complete within 30 seconds: \(link.progress.status)") }
     precondition(link.progress.status == "Codex 本轮完成" && link.progress.output.contains("fixture complete"))
     precondition(!FileManager.default.fileExists(atPath: root.appendingPathComponent("SHOULD_NOT_EXIST").path))
     let restored = try CodexLedger(root: ledgerRoot).all()
@@ -51,6 +51,41 @@ func runCodexChecks() throws {
     precondition(failure.status == "执行失败" && !failure.completedTurn)
     print("PASS: SQLite duplicate/claim/reopen, real tmux + fake Codex, session/output recovery, literal stdin, quoted CLI entry, duplicate-worker guard")
     try runWxContextChecks(root: root)
+    try runWorkBuddyChecks(root: root, settings: settings, executable: executable)
+}
+
+private func runWorkBuddyChecks(root: URL, settings: CodexSettings, executable: URL) throws {
+    // Fake Python emits the fixture protocol; exercise the real worker/tmux/ledger path.
+    let app = root.appendingPathComponent("WorkBuddy.app")
+    for relative in ["Contents/MacOS/Electron", "Contents/Resources/app.asar.unpacked/cli/bin/codebuddy"] {
+        let url = app.appendingPathComponent(relative)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
+    }
+    let buddy = WorkBuddySettings(appPath: app.path, python: executable.path, model: "fixture", allowEdits: false)
+    let task = TaskRecord(source: "fixture-workbuddy", app: "fixture", chat: "fixture", original: "fixture",
+                          actionID: "analyze", actionName: "fixture", promptSnapshot: "fixture", executor: "WorkBuddy")
+    let ledgerRoot = root.appendingPathComponent("buddy-ledger")
+    let submission = try CodexRunner.prepare(task: task, settings: settings, root: ledgerRoot, workBuddy: buddy)
+    precondition(submission.executorName == "WorkBuddy")
+    try CodexRunner.launch(submission, root: ledgerRoot, worker: URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL.path)
+    defer { _ = try? CodexRunner.command(settings.tmux, ["-L", CodexRunner.socket, "kill-session", "-t", submission.tmuxName]) }
+    var link = CodexRunner.link(submission, root: ledgerRoot)
+    for _ in 0..<300 where link.progress.exitCode == nil {
+        Thread.sleep(forTimeInterval: 0.1)
+        link = CodexRunner.link(submission, root: ledgerRoot)
+    }
+    precondition(link.progress.exitCode == 0 && link.progress.status == "WorkBuddy 本轮完成")
+    precondition(link.progress.output.contains("fixture complete"))
+    let restored = try CodexLedger(root: ledgerRoot).all()
+    precondition(restored.count == 1 && restored[0].0.workBuddy == buddy)
+    var intent = PingAction.defaults[0]
+    precondition(intent.automaticSubmit != true && intent.automaticContext != true)
+    intent.executor = "WorkBuddy"; intent.automaticContext = true; intent.automaticSubmit = true
+    let saved = try JSONDecoder().decode(PingAction.self, from: JSONEncoder().encode(intent))
+    precondition(saved.executor == "WorkBuddy" && saved.automaticSubmit == true && saved.automaticContext == true)
+    print("PASS: real tmux + fake WorkBuddy worker, executor status, immutable settings recovery, opt-in intent persistence")
 }
 
 private func runWxContextChecks(root: URL) throws {

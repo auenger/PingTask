@@ -4,11 +4,12 @@ import AppKit
 /// A local, native reader. Markdown never executes HTML or loads remote images.
 struct CodexResponseView: View {
     let markdown: String
+    var title = "Codex 返回"
     @State private var raw = false
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
-                Label("Codex 返回", systemImage: "doc.text").font(.headline)
+                Label(title, systemImage: "doc.text").font(.headline)
                 Spacer()
                 Picker("显示方式", selection: $raw) {
                     Text("预览").tag(false)

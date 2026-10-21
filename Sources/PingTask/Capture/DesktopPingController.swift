@@ -11,6 +11,7 @@ import ApplicationServices
     @Published var taskID: UUID?
     @Published var conversationQuery = ""
     @Published var messageQuery = ""
+    @Published var enterpriseContext: EnterpriseContext?
     @Published var contacts: [WxContact] = []
     @Published var chosenContact: WxContact?
     @Published var results: WxSearchPage?
@@ -152,7 +153,7 @@ import ApplicationServices
                                            chat: "桌面来源 · 尚未定位会话", sender: "OCR（非消息身份）",
                                            text: captured.pointedText.isEmpty ? "指针附近未识别到文字，请查看截图。" : captured.pointedText,
                                            resolvedAnchor: "capture/\(captured.id.uuidString)", evidence: captured.evidence)
-                guard store.capture(source, action: action, executor: "Codex", desktopCapture: captured) else {
+                guard store.capture(source, action: action, executor: action.executor == "WorkBuddy" ? "WorkBuddy" : "Codex", desktopCapture: captured) else {
                     try? FileManager.default.removeItem(at: captured.imageURL)
                     throw WxFailure(message: "截图草稿保存失败；请检查本地存储权限")
                 }
@@ -160,10 +161,41 @@ import ApplicationServices
                 taskID = store.selected
                 prepare(captured)
                 wheel.hide()
+                if let platform = ChatPlatform.detect(target.bundleID), platform != .wechat {
+                    busy = false
+                    showReview()
+                    if platform == .lark && action.automaticContext == true && !target.isTextEntry { locateEnterprise() }
+                    else { status = "已识别\(platform.label)窗口；请核对消息来源。企业聊天暂不自动提交。" }
+                    return
+                }
+                if action.automaticContext == true {
+                    status = "正在按意图配置定位微信消息并读取附近上下文…"
+                    let adapter = WxviewAdapter(path: adapterPath)
+                    do {
+                        let source = try await Task.detached { try AutomaticWeChat.resolve(capture: captured, adapter: adapter) }.value
+                        guard generation == token, let originalID = taskID else { busy = false; return }
+                        guard store.resolveDesktop(originalID, source: source, automatic: true) else { throw WxFailure(message: "无法保存自动定位来源") }
+                        taskID = store.selected
+                        if action.automaticSubmit == true, taskID == originalID {
+                            store.submit(originalID)
+                            status = store.codexBusy.contains(originalID) ? "正在按意图配置提交；启动结果见任务记录。" : store.notice
+                        } else {
+                            status = taskID == originalID ? "已自动附加上下文，草稿等待提交。" : "发现已有任务，已打开原记录；未重复提交。"
+                        }
+                        busy = false
+                        showReview()
+                        return
+                    } catch {
+                        status = (error as? WxFailure)?.message ?? "自动定位失败，已保留截图草稿；请人工核对。"
+                        busy = false
+                        showReview()
+                        return
+                    }
+                }
                 showReview()
                 busy = false
-                if target.bundleID == "com.tencent.xinWeChat" { locateConversation(automatic: true) }
-                else { status = "已保存截图。目标不是受支持的微信应用，可核对后仅保留截图草稿。" }
+                if target.bundleID == "com.tencent.xinWeChat" && !target.isTextEntry { locateConversation(automatic: true) }
+                else { status = "已保存截图。目标未进入自动消息查询，请核对来源或仅保留截图草稿。" }
             } catch {
                 wheel.hide()
                 busy = false
@@ -173,6 +205,7 @@ import ApplicationServices
         }
     }
     private func prepare(_ captured: DesktopCapture) {
+        enterpriseContext = nil
         contacts = []; chosenContact = nil; results = nil; account = nil
         conversationQuery = MessageClues.titles(captured).first ?? ""
         messageQuery = MessageClues.keyword(captured.pointedText)
@@ -261,9 +294,34 @@ import ApplicationServices
         taskID = store.selected
         status = "已确认原消息及附近上下文；可到任务记录提交。"
     }
+    func locateEnterprise() {
+        guard !busy, let capture, ChatPlatform.detect(capture.target.bundleID) == .lark else { return }
+        let settings = EnterpriseChatSettings()
+        let adapter = LarkContextAdapter(path: settings.larkPath, profile: settings.larkProfile)
+        let title = conversationQuery, start = startDate, end = endDate
+        let token = generation
+        enterpriseContext = nil; busy = true
+        status = "正在读取飞书会话；最多 50 条，完成后请核对来源。"
+        Task {
+            do {
+                let context = try await Task.detached { try adapter.context(title: title, start: start, end: end) }.value
+                guard generation == token else { busy = false; return }
+                enterpriseContext = context
+                status = context.messages.isEmpty ? "此范围没有消息；截图已保留。" : "已读取 \(context.messages.count) 条消息；请选择真实来源。未自动提交。"
+            } catch { status = error.localizedDescription }
+            busy = false
+        }
+    }
+    func acceptEnterprise(_ message: EnterpriseMessage) {
+        guard !busy, let id = taskID, let context = enterpriseContext,
+              let original = context.messages.first(where: { $0.id == message.id && $0.chat == message.chat }) else { return }
+        guard store.resolveDesktop(id, source: context.source(original)) else { status = "无法保存来源，请核对任务状态"; return }
+        taskID = store.selected
+        status = "已确认飞书消息并附带本页附近上下文；草稿等待明确提交。"
+    }
     func keepScreenshot() {
         guard !busy, let id = taskID else { return }
         guard store.keepDesktopScreenshot(id) else { status = "无法更新截图草稿，请检查记录状态或本地存储"; return }
-        status = "保留为截图来源草稿；未定位微信会话，等待明确提交。"
+        status = "保留为截图来源草稿；未定位聊天会话，等待明确提交。"
     }
 }

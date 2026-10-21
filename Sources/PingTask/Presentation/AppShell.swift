@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var sourceIndex = 0
     @State private var executor = "Codex"
     @State private var hovered: String?
+    @State private var capturingAttachment = false
     private let accent = AppStyle.gold
 
     var body: some View {
@@ -46,6 +47,7 @@ struct ContentView: View {
         .onAppear { tab = initialTab }
         .task {
             if !store.isolated {
+                wechat.start()
                 do {
                     try await Task.detached { try CodexSettings.ensureDefaultWorkspace() }.value
                     store.codexSettings.save()
@@ -123,6 +125,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("\(source.chat)  ·  \(source.sender)").font(.caption).foregroundStyle(.secondary)
                     ScrollView { Text(source.text).font(.title3).lineSpacing(5) }.frame(maxHeight: 100)
+                    if let media = source.media { Label("将附带：\(media.name)", systemImage: "paperclip").font(.caption) }
                     Text(source.resolvedAnchor == nil ? "虚构消息 · 固定消息 ID · 模拟执行" : "真实本地缓存消息 · 用户确认后交给执行器").font(.caption2).foregroundStyle(.secondary)
                 }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 16))
@@ -132,7 +135,7 @@ struct ContentView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("执行器", selection: $executor) {
                     Text(realSource == nil ? "Codex（模拟）" : "Codex CLI").tag("Codex")
-                    Text("WorkBuddy（模拟）").tag("WorkBuddy")
+                    Text(realSource == nil ? "WorkBuddy（模拟）" : "WorkBuddy Agent").tag("WorkBuddy")
                 }
             } }.frame(width: 420)
             Divider()
@@ -181,7 +184,21 @@ struct ContentView: View {
 
     func capture(_ action: PingAction) {
         if !action.createsTask { desktop.playEffect(action); return }
-        store.capture(realSource ?? SourceMessage.examples[sourceIndex], action: action, executor: executor)
+        guard !capturingAttachment else { return }
+        let source = realSource ?? SourceMessage.examples[sourceIndex], executor = executor
+        let existing = store.tasks.contains { Identity.key($0) == Identity.key(source: source.anchor, action: action.id, executor: executor) && $0.status != "已取消" }
+        guard let media = source.media, !existing else { store.capture(source, action: action, executor: executor); return }
+        capturingAttachment = true; store.notice = "正在保存附件副本…"
+        Task {
+            defer { capturingAttachment = false }
+            do {
+                let attachment = try await MediaIO.shared.snapshot(media)
+                let saved = store.capture(source, action: action, executor: executor, attachments: [attachment])
+                if !saved || !store.tasks.contains(where: { ($0.attachments ?? []).contains(where: { $0.id == attachment.id }) }) {
+                    try? FileManager.default.removeItem(atPath: attachment.path)
+                }
+            } catch { store.notice = "附件无法保存：请核对本机文件是否存在、大小及读取权限。" }
+        }
     }
 
     func taskText(_ id: UUID, _ keyPath: WritableKeyPath<TaskRecord, String>) -> Binding<String> {
@@ -208,8 +225,15 @@ struct ContentView: View {
                 }
                 Text(task.original).padding(12).frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 10))
+                ForEach(task.attachments ?? []) { attachment in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label(attachment.name, systemImage: "paperclip")
+                        Text("已保存独立副本 · 提交时告知 Agent 分析\(attachment.isThumbnail ? " · 仅缩略图" : "")").font(.caption).foregroundStyle(.secondary)
+                        Button("查看附件副本") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: attachment.path)]) }
+                    }
+                }
                 Text("执行器 · \(task.executor)").font(.callout.bold())
-                if !store.isSimulation(task), task.executor == "Codex" {
+                if !store.isSimulation(task), ["Codex", "WorkBuddy"].contains(task.executor) {
                     CodexTaskView(store: store, task: task)
                 }
                 Text("本次提示词快照").font(.headline)
@@ -227,9 +251,9 @@ struct ContentView: View {
 
                 HStack {
                     if task.status == "待确认" {
-                        Button(store.isSimulation(task) ? "确认提交（模拟）" : "确认交给 Codex CLI") { store.submit(task.id) }
+                        Button(store.isSimulation(task) ? "确认提交（模拟）" : "确认交给 \(task.executor)") { store.submit(task.id) }
                             .buttonStyle(.borderedProminent).tint(accent)
-                            .disabled(!Identity.canSubmit(task) || store.codexBusy.contains(task.id) || (!store.isSimulation(task) && task.executor != "Codex"))
+                            .disabled(!Identity.canSubmit(task) || store.codexBusy.contains(task.id) || (!store.isSimulation(task) && !["Codex", "WorkBuddy"].contains(task.executor)))
 
                     } else if task.status == "模拟完成" {
                         Button("确认补充并继续（模拟）") { store.submit(task.id, continuing: true) }

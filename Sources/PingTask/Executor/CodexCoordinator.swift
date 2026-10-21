@@ -8,25 +8,26 @@ extension Store {
     func submitCodex(_ id: UUID) {
         guard !codexBusy.contains(id), let task = tasks.first(where: { $0.id == id }),
               Identity.canSubmit(task), task.codex == nil else { return }
-        guard task.executor == "Codex" else { notice = "WorkBuddy 尚未接入"; return }
+        guard ["Codex", "WorkBuddy"].contains(task.executor) else { return }
         guard tasks.filter({ $0.codex != nil && $0.codex?.progress.exitCode == nil }).count + codexBusy.count < 4 else {
-            notice = "最多同时跟踪 4 个未结束的 Codex 执行；请先完成或核对现有任务"
+            notice = "最多同时跟踪 4 个未结束的 Agent 执行；请先完成或核对现有任务"
             return
         }
         let settings = codexSettings
-        do { try settings.validate() } catch { notice = error.localizedDescription; return }
+        let buddy = task.executor == "WorkBuddy" ? workBuddySettings : nil
+        do { if let buddy { try buddy.validate() } else { try settings.validate() } } catch { notice = error.localizedDescription; return }
         let worker = Bundle.main.executableURL?.path ?? CommandLine.arguments[0]
         codexBusy.insert(id)
-        notice = "正在保存提交快照并启动 Codex…"
+        notice = "正在保存提交快照并启动 \(task.executor)…"
         Task {
             do {
                 let link = try await Task.detached(priority: .userInitiated) {
-                    let submission = try CodexRunner.prepare(task: task, settings: settings)
+                    let submission = try CodexRunner.prepare(task: task, settings: settings, workBuddy: buddy)
                     try CodexRunner.launch(submission, root: CodexFiles.root, worker: worker)
                     return CodexRunner.link(submission)
                 }.value
                 applyCodex(link, id: id)
-                notice = "已交给 tmux 中的 Codex CLI；关闭 PingTask 不会中断任务"
+                notice = "已交给 tmux 中的 \(task.executor)；关闭 PingTask 不会中断任务"
             } catch {
                 notice = "未确认启动成功：\(error.localizedDescription)。刷新状态核对原提交，不会自动重复派发。"
                 await refreshCodex()
@@ -40,12 +41,12 @@ extension Store {
         tasks[i].codex = link
         tasks[i].operationID = link.operationID
         tasks[i].revision = max(1, tasks[i].revision)
-        tasks[i].status = link.progress.status
+        tasks[i].status = old.executor == "WorkBuddy" && link.progress.status == "Codex 执行中" ? "WorkBuddy 执行中" : link.progress.status
         tasks[i].updated = link.progress.updated
         if old.codex == nil { tasks[i].events.append("已冻结初次提交；工作目录：\(link.workspace)") }
         if old.status != tasks[i].status { tasks[i].events.append(tasks[i].status) }
         if old.codex?.progress.sessionID == nil, let session = link.progress.sessionID {
-            tasks[i].events.append("Codex session：\(session)")
+            tasks[i].events.append("\(old.executor) session：\(session)")
         }
         if old.codex != link { save() }
     }
@@ -72,10 +73,15 @@ extension Store {
                 return result
             }.value
             for (id, link) in links { applyCodex(link, id: id) }
-        } catch { notice = "无法核对 Codex 状态：\(error.localizedDescription)" }
+        } catch { notice = "无法核对 Agent 状态：\(error.localizedDescription)" }
     }
     func openCodex(_ id: UUID) {
         guard let task = tasks.first(where: { $0.id == id }), let link = task.codex else { return }
+        if task.executor == "WorkBuddy" {
+            NSWorkspace.shared.open(URL(fileURLWithPath: link.directory))
+            notice = "已打开 WorkBuddy 本次提交与结果；桌面会话找回尚未验证。"
+            return
+        }
         Task {
             do {
                 let url = try await Task.detached {

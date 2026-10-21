@@ -9,6 +9,9 @@ struct PingAction: Codable, Identifiable {
     var symbol: String
     var artwork: String? = nil
     var onWheel: Bool? = nil
+    var executor: String? = nil
+    var automaticContext: Bool? = nil
+    var automaticSubmit: Bool? = nil
     var effectOnly: Bool? = nil
     var createsTask: Bool { effectOnly != true }
     var prompt: String
@@ -32,6 +35,7 @@ struct SourceMessage: Identifiable {
     let text: String
     var resolvedAnchor: String? = nil
     var evidence: String? = nil
+    var media: LocalMedia? = nil
     var anchor: String { resolvedAnchor ?? "\(app)/demo-account/\(chat)/\(id)" }
     static let examples = [
         SourceMessage(id: "msg-001", app: "微信", chat: "产品研发群", sender: "林舟",
@@ -55,6 +59,7 @@ struct TaskRecord: Codable, Identifiable {
     var executor: String
     var evidence: String? = nil
     var captures: [DesktopCapture]? = nil
+    var attachments: [TaskAttachment]? = nil
     var requiresSourceConfirmation: Bool? = nil
     var note = ""
     var status = "待确认"
@@ -96,6 +101,7 @@ struct SavedState: Codable {
     @Published var tasks: [TaskRecord] = []
     @Published var selected: UUID?
     @Published var notice = "就绪 · 截图与任务记录仅保存在本机"
+    @Published var workBuddySettings = WorkBuddySettings.saved
     @Published var codexSettings = CodexSettings.saved
     @Published var codexBusy = Set<UUID>()
     var refreshingCodex = false
@@ -132,7 +138,7 @@ struct SavedState: Codable {
         }
     }
 
-    @discardableResult func capture(_ source: SourceMessage, action: PingAction, executor: String, desktopCapture: DesktopCapture? = nil) -> Bool {
+    @discardableResult func capture(_ source: SourceMessage, action: PingAction, executor: String, desktopCapture: DesktopCapture? = nil, attachments: [TaskAttachment] = []) -> Bool {
         let prior = tasks, priorSelection = selected
         guard action.createsTask else { notice = "仅播放特效，不创建任务"; return false }
         let key = Identity.key(source: source.anchor, action: action.id, executor: executor)
@@ -146,6 +152,7 @@ struct SavedState: Codable {
                                   original: source.text, actionID: action.id, actionName: action.name,
                                   promptSnapshot: action.prompt, executor: executor)
             task.evidence = source.evidence
+            if !attachments.isEmpty { task.attachments = attachments }
             if let desktopCapture { task.captures = [desktopCapture]; task.requiresSourceConfirmation = true }
             task.events = [source.resolvedAnchor == nil ? "已捕获模拟消息，创建待确认草稿" : "已选择真实微信消息，创建待确认草稿；尚未提交执行"]
             if desktopCapture != nil { task.events = ["已保存真实窗口截图与意图；来源待核对，未派发"] }
@@ -157,7 +164,7 @@ struct SavedState: Codable {
         return true
     }
 
-    @discardableResult func resolveDesktop(_ id: UUID, source: SourceMessage) -> Bool {
+    @discardableResult func resolveDesktop(_ id: UUID, source: SourceMessage, automatic: Bool = false) -> Bool {
         guard let i = tasks.firstIndex(where: { $0.id == id }), tasks[i].status == "待确认",
               tasks[i].requiresSourceConfirmation == true else { return false }
         let prior = tasks
@@ -171,7 +178,7 @@ struct SavedState: Codable {
             tasks[i].source = source.anchor; tasks[i].app = source.app; tasks[i].chat = source.chat
             tasks[i].original = source.text; tasks[i].evidence = source.evidence
             tasks[i].requiresSourceConfirmation = false
-            tasks[i].events.append("用户确认 wxview 消息候选，来源身份已绑定")
+            tasks[i].events.append(automatic ? "按预先启用的意图规则自动绑定唯一 wxview 消息及上下文" : "用户确认 wxview 消息候选，来源身份已绑定")
             selected = id
         }
         if !save() { tasks = prior; selected = id; return false }
@@ -245,15 +252,21 @@ struct SavedState: Codable {
         let retained = Set(tasks.flatMap { $0.captures ?? [] }.map(\.id))
         var cleaned = Set<UUID>()
         var cleanupFailed = false
+        let retainedAttachments = Set(tasks.flatMap { $0.attachments ?? [] }.map(\.id))
+        for attachment in removed.attachments ?? [] where !retainedAttachments.contains(attachment.id) {
+            do { try trash(URL(fileURLWithPath: attachment.path)) } catch { cleanupFailed = true }
+        }
         for capture in removed.captures ?? [] where !retained.contains(capture.id) && cleaned.insert(capture.id).inserted {
             do { try trash(capture.imageURL) } catch { cleanupFailed = true }
         }
-        notice = cleanupFailed ? "记录已删除；部分截图未能移入废纸篓，仍保留在本机。" : "本地记录已删除，独占截图已移入废纸篓"
+        notice = cleanupFailed ? "记录已删除；部分附件或截图未能移入废纸篓，仍保留在本机。" : "本地记录已删除，独占附件与截图已移入废纸篓"
         return true
     }
 }
 
 struct PingTaskApp: App {
+    @NSApplicationDelegateAdaptor(AppPresenceDelegate.self) private var appDelegate
+    @Environment(\.openWindow) private var openWindow
     @StateObject private var store: Store
     @StateObject private var desktop: DesktopPingController
     init() {
@@ -267,10 +280,11 @@ struct PingTaskApp: App {
         _desktop = StateObject(wrappedValue: DesktopPingController(store: store))
     }
     var body: some Scene {
-        WindowGroup("PingTask") { ContentView(store: store, desktop: desktop) }
+        Window("PingTask", id: "main") { ContentView(store: store, desktop: desktop) }
             .defaultSize(width: 1280, height: 860)
         MenuBarExtra {
             Button("打开 PingTask") {
+                openWindow(id: "main")
                 NSApp.activate(ignoringOtherApps: true)
                 NSApp.windows.first(where: { $0.canBecomeMain })?.makeKeyAndOrderFront(nil)
             }
@@ -382,7 +396,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--codex-worker"), CommandLi
 } else if CommandLine.arguments.contains("--self-test") {
     MainActor.assumeIsolated {
         runChecks()
-        do { try runWxviewChecks(); try runDesktopChecks() } catch { fatalError("wxview fixture checks failed: \(error)") }
+        do { try runWxviewChecks(); try runDesktopChecks(); try runEnterpriseChatChecks() } catch { fatalError("wxview fixture checks failed: \(error)") }
     }
 } else if CommandLine.arguments.contains("--render-wheel") {
     MainActor.assumeIsolated {

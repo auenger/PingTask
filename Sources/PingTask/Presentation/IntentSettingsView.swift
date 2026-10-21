@@ -140,6 +140,18 @@ struct IntentSettingsView: View {
                 .font(.callout).foregroundStyle(.secondary)
             if value.createsTask {
                 VStack(alignment: .leading, spacing: 10) {
+                    Picker("处理 Agent", selection: Binding(get: { value.executor ?? "Codex" }, set: { chosen in store.updateIntent(value.id) { $0.executor = chosen } })) {
+                        Text("Codex CLI").tag("Codex")
+                        Text("WorkBuddy Agent").tag("WorkBuddy")
+                    }
+                    Toggle("自动查询聊天上下文（微信 / 飞书）", isOn: Binding(get: { value.automaticContext == true }, set: { enabled in
+                        store.updateIntent(value.id) { $0.automaticContext = enabled; if !enabled { $0.automaticSubmit = false } }
+                    }))
+                    Toggle("定位成功后自动提交给 Agent", isOn: Binding(get: { value.automaticSubmit == true }, set: { enabled in
+                        store.updateIntent(value.id) { $0.automaticSubmit = enabled }
+                    })).disabled(value.automaticContext != true)
+                    Text("飞书仍需手动确认消息，不自动提交；钉钉查询待接入。微信开启自动提交即授权后续此意图的 Ping：唯一匹配后，将正文、附近上下文与 OCR 交给所选 Agent；Codex 还接收截图。沿用设置中的工作目录和权限。歧义、低置信度、截断或失败时保留草稿，不重复派发已有任务。")
+                        .font(.caption).foregroundStyle(.secondary)
                     Text("任务提示词").font(.headline)
                     TextEditor(text: binding(value, \.prompt)).font(.system(size: 13)).scrollContentBackground(.hidden)
                         .frame(minHeight: 160).padding(12).background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))

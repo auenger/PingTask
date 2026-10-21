@@ -30,6 +30,11 @@ import Vision
     precondition(CaptureGeometry.appKitPoint(CGPoint(x: -800, y: -100), primaryHeight: 900) == CGPoint(x: -800, y: 1000))
     let target = DesktopTarget(windowID: 99, processID: 1, appName: "测试微信", bundleID: "com.tencent.xinWeChat", title: "测试群 (12)",
                                bounds: CGRect(x: -900, y: 200, width: 800, height: 600), pointer: CGPoint(x: -500, y: 500), displayID: 2, scale: 2)
+    var inputTarget = target
+    inputTarget.elementRole = "AXTextArea"
+    precondition(inputTarget.isTextEntry && !target.isTextEntry)
+    let restoredTarget = try JSONDecoder().decode(DesktopTarget.self, from: JSONEncoder().encode(inputTarget))
+    precondition(restoredTarget.isTextEntry)
     precondition(CaptureGeometry.normalizedPointer(target) == CGPoint(x: 0.5, y: 0.5))
     let lines = [OCRLine(text: "测试消息的正文", bounds: CGRect(x: 0.4, y: 0.48, width: 0.3, height: 0.04), confidence: 0.99),
                  OCRLine(text: "不相关消息", bounds: CGRect(x: 0.4, y: 0.2, width: 0.3, height: 0.04), confidence: 0.99)]
@@ -161,8 +166,21 @@ import Vision
         store.capture(SourceMessage.examples[0], action: store.actions[0], executor: "Codex")
     }
     let model = DesktopPingController(store: store)
+    let fixtureRoot = FileManager.default.temporaryDirectory.appendingPathComponent("PingTask-media-preview-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: fixtureRoot) }
+    let wxFixture = tab == 9 ? try wxPreviewFixture(root: fixtureRoot) : nil
+    if tab == 10 {
+        model.conversationQuery = "合成项目群"
+        model.enterpriseContext = EnterpriseContext(identity: LarkIdentity(profile: "fixture", app: "app", brand: "lark", user: "user"), chatID: "oc_fixture", chatName: "合成项目群",
+            messages: [EnterpriseMessage(id: "om_fixture", chat: "oc_fixture", text: "请分析这次需求变更，并整理下一步任务。此消息是界面测试数据。", sender: "测试成员", time: "2026-10-21 10:30")], hasMore: true, start: Date().addingTimeInterval(-86400), end: Date())
+    }
     let content = Group {
-        if tab == 8 {
+        if tab == 10 {
+            ScrollView { EnterpriseCaptureView(model: model, store: store, platform: .lark).padding(28) }
+                .background(AppStyle.canvas).preferredColorScheme(.dark)
+        } else if let wxFixture {
+            WeChatSourceView(model: wxFixture, select: { _ in }).background(AppStyle.canvas).preferredColorScheme(.dark)
+        } else if tab == 8 {
             ArtworkPicker(store: store, current: "png_enemymissing_128x128", choose: { _ in })
         } else if tab == 7 {
             ScrollView {
@@ -201,7 +219,7 @@ import Vision
     window.contentView = hosting
     window.orderFront(nil)
     defer { window.orderOut(nil) }
-    RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+    RunLoop.main.run(until: Date().addingTimeInterval(tab == 9 ? 1.5 : 0.4))
     hosting.layoutSubtreeIfNeeded()
     hosting.displayIfNeeded()
     guard let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else {

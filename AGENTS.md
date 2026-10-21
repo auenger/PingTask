@@ -9,6 +9,7 @@ The app owns capture, context handoff, task identity, and local history.
 External agents own reasoning and task execution.
 
 Read `docs/06-codex-cli.md` for the implemented tmux + Codex CLI handoff.
+Read `docs/07-workbuddy.md` for the experimental WorkBuddy CLI + IPC adapter.
 Do not replace it with App Server or embed a conversation UI without a product decision.
 
 Read `README.md` first. Read the relevant design document before changing
@@ -22,11 +23,20 @@ product behavior:
 
 ## Current implementation
 
-- Swift Package Manager executable, SwiftUI and AppKit, no third-party runtime dependencies.
+- Swift Package Manager executable, SwiftUI and AppKit, no third-party Swift dependencies. External executors require their local CLI/runtime; WorkBuddy additionally requires Python 3.
 - Deployment target macOS 13; macOS 13 capture and multi-display behavior still need real testing.
 - `main.swift`: models, Store, deterministic demo data, simulated executor, app and CLI entry points.
 - `Capture/`: configurable Alt / Ctrl event tap, single-window ScreenCaptureKit capture, Vision OCR, capture controller and isolated checks.
 - `SourceAdapter/`: bounded wxview CLI calls, schema validation, single-account checks and fixtures.
+- Recent conversation lists use `sessions` sorted by last message time, not contact username.
+  Retain the address-book fallback; deduplicate IDs across offset pages after cache changes.
+- `WxMedia` validates account-local paths, symlinks and the 32 MB limit. Media IO runs
+  off the main actor. Attachments require explicit user selection, independent snapshots
+  and hash verification before dispatch. Preserve duplicate-task snapshots and shared files.
+- History browsing requires explicit descending order and opaque cursor pagination.
+  Keep the first request's Unix bounds across pages; metadata times are formatted
+  in the CLI timezone. Never compare formatted times directly to Unix strings,
+  execute arbitrary next_args, or silently fall back to legacy seq-only paging.
 - `Resolver/`: title/OCR clues, bounded message search and explicit candidate confirmation.
 - `Presentation/`: sidebar app shell, desktop source review, intent editor, task records, WeChat connection, settings, wheel and transient effects.
 - `Intent/`: stable intent CRUD, wheel membership/order, artwork catalog and bounded local image import.
@@ -49,16 +59,22 @@ or automatically load remote images. `--render-desktop 7 <path>` renders a
 synthetic result fixture without reading user task content.
 MenuBarExtra must receive a separate NSImage sized to 18 x 18 points; a SwiftUI
 frame on a large source image is insufficient. Do not mutate the shared app logo.
+`AppPresence` applies the saved menu-bar-only preference through activation policy
+in the GUI lifecycle. Never change activation policy in workers or isolated checks.
+Keep the menu action able to recreate the main window after it has been closed.
 Use `omw.png` for the continuation icon; `pingwheel_omw.png` is the flat variant.
 Inspect upstream artwork pixels before selecting assets, not just filenames.
 
 ## Product invariants
 
-1. Releasing a task-mode Ping captures intent; it does not silently dispatch a task.
+1. By default, releasing a task-mode Ping captures intent without dispatch.
+   Users may explicitly opt an intent into automatic context and submission.
+   Ambiguous/truncated evidence remains a draft; existing tasks are not resubmitted.
    Effect-only intents must bypass capture, OCR, wxview and task creation entirely.
    Task-mode capture also plays the Ping effect; keep its lifetime independent of
    capture progress and place the progress indicator clear of the icon.
-2. Explicit confirmation freezes the payload for that submission.
+2. Explicit confirmation or an explicitly opted-in automatic submission freezes
+   the payload for that submission.
 3. Repeated Ping on the same source/action/executor opens the existing
    draft or task and preserves the user's edits.
 4. Repeated submit cannot create another revision while the current one is active.
@@ -120,7 +136,7 @@ Production continuation must resolve an existing task explicitly.
 
 ## Integrations and private data
 
-- Implemented source adapter: wxview. Planned: lark-cli, dws; executors Codex and WorkBuddy.
+- Implemented source adapters: wxview and experimental lark-cli (manual confirmation, live validation pending). dws message retrieval remains pending; executors are Codex and experimental WorkBuddy.
 - Inspect actual CLI help/schema and official API contracts before using
   commands; do not invent parameters, IDs, or supported capabilities.
 - Invoke commands with executable + argument arrays, never user text
@@ -208,3 +224,10 @@ Record what was visually inspected and what still requires manual testing.
 - Custom image imports run off the main thread, limit file size/dimensions, and save metadata-free PNG copies under `Artwork/`. Persist opaque IDs, never arbitrary imported paths. Do not commit user images.
 - Center image changes appearance only; center release still cancels. The new-intent default applies only to later additions.
 - `--intent-check` uses isolated storage to verify migration, CRUD, history preservation, rollback, geometry and import. `--render-desktop 8 <path>` renders the bundled gallery; `--render-wheel <path>` includes an 8-slot fixture.
+
+## Enterprise chat integration
+
+- `docs/08-enterprise-chat.md` describes the current Lark/DingTalk boundaries. Enterprise Ping remains manual confirmation, even when intent auto-submit is enabled.
+- Lark profile is pinned before lookup; app/brand/user identity is checked before and after each CLI request. Fixtures must not query live chats.
+- DingTalk window detection is implemented; message retrieval is disabled until an installed dws contract is verified. Never claim it already retrieves context.
+- AX input-control exclusion is conservative; unknown role is not proof of a message region.

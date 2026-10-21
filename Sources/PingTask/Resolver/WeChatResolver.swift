@@ -51,7 +51,7 @@ enum MessageClues {
         var seen = Set<String>()
         return ([capture.target.title] + top).map(cleanTitle).filter {
             let key = normalize($0)
-            return key.count >= 2 && !["微信", "wechat", "weixin", "搜索", "search"].contains(key) && seen.insert(key).inserted
+            return key.count >= 2 && !["微信", "wechat", "weixin", "飞书", "lark", "钉钉", "dingtalk", "搜索", "search"].contains(key) && seen.insert(key).inserted
         }.prefix(3).map { String($0.prefix(80)) }
     }
     static func exactContacts(_ contacts: [WxContact], title: String) -> [WxContact] {

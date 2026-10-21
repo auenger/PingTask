@@ -38,7 +38,7 @@ struct CodexSettingsView: View {
                 Button(checking ? "正在检查…" : "检查连接") { check() }.disabled(checking)
                 Text(status).font(.caption).foregroundStyle(.secondary)
             }
-            Text("WorkBuddy 尚未接入。交互练习中的虚构消息仍使用模拟执行。").font(.caption2).foregroundStyle(.secondary)
+            Text("交互练习中的虚构消息仍使用模拟执行。").font(.caption2).foregroundStyle(.secondary)
         }.onChange(of: store.codexSettings) { settings in settings.save() }
     }
     func path(_ title: String, value: Binding<String>, directory: Bool) -> some View {
@@ -77,21 +77,21 @@ struct CodexTaskView: View {
                 } else { Text("尚未收到 session ID，请核对进度。").font(.caption) }
                 Text("tmux：\(link.tmuxName)").font(.caption2.monospaced()).foregroundStyle(.secondary)
                 HStack {
-                    Button("打开 Codex CLI") { store.openCodex(task.id) }
+                    Button(task.executor == "WorkBuddy" ? "查看 WorkBuddy 结果" : "打开 Codex CLI") { store.openCodex(task.id) }
                     Button("刷新状态") { Task { await store.refreshCodex() } }
                     Button("查看提交与日志") { NSWorkspace.shared.open(URL(fileURLWithPath: link.directory)) }
                 }
                 Text("首次执行状态 · \(link.progress.status) · \(link.progress.updated.formatted())")
                     .font(.caption).foregroundStyle(.secondary)
-                Text("CLI 中可继续同一对话。外部续聊的最新状态以 Codex 为准；本轮完成不代表结果已验收。")
+                Text(task.executor == "WorkBuddy" ? "实验性 CLI + IPC 接入，处理正文、OCR 与所选附件；图片理解、桌面任务列表及续聊入口尚未验证。" : "CLI 中可继续同一对话。外部续聊的最新状态以 Codex 为准；本轮完成不代表结果已验收。")
                     .font(.caption2).foregroundStyle(.secondary)
                 if !link.progress.output.isEmpty {
-                    CodexResponseView(markdown: link.progress.output).id(task.id)
+                    CodexResponseView(markdown: link.progress.output, title: "\(task.executor) 返回").id(task.id)
                 }
             } else {
                 Text("提交到：\(store.codexSettings.workspace.isEmpty ? "请先到设置选择工作目录" : store.codexSettings.workspace)")
                     .font(.caption).textSelection(.enabled)
-                Text("权限：\(store.codexSettings.sandbox == "workspace-write" ? "允许修改工作目录" : "只读分析") · 将来源正文和最多 4 张截图交给 Codex")
+                Text(task.executor == "WorkBuddy" ? "WorkBuddy 接收正文、OCR 与所选附件；工具权限由设置决定，工作目录不是文件系统沙箱。" : "权限：\(store.codexSettings.sandbox == "workspace-write" ? "允许修改工作目录" : "只读分析") · 提供正文、所选附件及最多 4 张图片（含截图）")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

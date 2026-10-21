@@ -65,6 +65,9 @@ struct DesktopCaptureView: View {
                                 }
                             }
                         }.frame(maxWidth: .infinity)
+                        if let platform = ChatPlatform.detect(capture.target.bundleID), platform != .wechat {
+                            EnterpriseCaptureView(model: model, store: store, platform: platform)
+                        } else {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("核对消息来源").font(.headline)
                             TextField("会话标题 / 群名", text: $model.conversationQuery)
@@ -107,6 +110,7 @@ struct DesktopCaptureView: View {
                             Button("未定位会话，仅保留截图草稿") { model.keepScreenshot() }.disabled(!pending)
                             if !pending { Button("查看任务草稿", action: openTasks).buttonStyle(.borderedProminent) }
                         }.frame(width: 370)
+                        }
                     }.disabled(model.busy)
                 } else {
                     HStack(spacing: 24) {

@@ -74,6 +74,8 @@ struct CodexSubmission: Codable {
     let prompt: String
     let imagePaths: [String]
     let payloadHash: String
+    var workBuddy: WorkBuddySettings? = nil
+    var executorName: String { workBuddy == nil ? "Codex" : "WorkBuddy" }
     var tmuxName: String { "ping-" + taskID.uuidString.lowercased() }
 }
 

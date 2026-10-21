@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import ScreenCaptureKit
 import Vision
 import CoreImage
@@ -15,6 +16,8 @@ struct DesktopTarget: Codable {
     let pointer: CGPoint
     let displayID: UInt32
     let scale: CGFloat
+    var elementRole: String? = nil
+    var isTextEntry: Bool { ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(elementRole ?? "") }
 }
 struct OCRLine: Codable {
     let text: String
@@ -87,9 +90,22 @@ enum DesktopCaptureService {
                                  appName: info[kCGWindowOwnerName as String] as? String ?? "未知应用",
                                  bundleID: NSRunningApplication(processIdentifier: pid)?.bundleIdentifier ?? "",
                                  title: info[kCGWindowName as String] as? String ?? "",
-                                 bounds: bounds, pointer: point, displayID: display, scale: scale)
+                                 bounds: bounds, pointer: point, displayID: display, scale: scale, elementRole: elementRole(at: point, pid: pid))
         }
         throw WxFailure(message: "指针下没有可捕获的其他应用窗口；请指向消息后再 Ping")
+    }
+
+    private static func elementRole(at point: CGPoint, pid: pid_t) -> String? {
+        guard AXIsProcessTrusted() else { return nil }
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.15)
+        var element: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &element) == .success,
+              let element else { return nil }
+        AXUIElementSetMessagingTimeout(element, 0.15)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &value) == .success else { return nil }
+        return value as? String
     }
 
     static func capture(_ target: DesktopTarget) async throws -> DesktopCapture {

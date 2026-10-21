@@ -100,6 +100,9 @@ struct WxContact: Decodable, Identifiable {
     let remark: String
     let nickName: String
     let alias: String
+    var lastTimestamp: Int64? = nil
+    var unreadCount: Int? = nil
+    var summary: String? = nil
     var id: String { username }
     var name: String { [remark, nickName, alias, username].first { !$0.isEmpty } ?? username }
 }
@@ -111,6 +114,9 @@ struct WxPage: Decodable {
         let start: String
         let end: String
         let hasMore: Bool
+        var nextArgs: [String]? = nil
+        var order: String? = nil
+        var nextCursor: String? = nil
     }
     let meta: Meta
     let items: [WxMessage]
