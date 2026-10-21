@@ -10,6 +10,26 @@ import Vision
         precondition(trigger.isOther([.maskAlternate, .maskControl]))
         precondition(PingTrigger(rawValue: trigger.rawValue) == trigger)
     }
+    let shortcut = PingKeyboardShortcut(keyCode: 35, modifiers: CGEventFlags([.maskControl, .maskAlternate]).rawValue, keyLabel: "P")
+    precondition(shortcut.matches(key: 35, flags: [.maskControl, .maskAlternate]))
+    precondition(!shortcut.matches(key: 35, flags: [.maskControl]))
+    precondition(!shortcut.matches(key: 35, flags: [.maskControl, .maskAlternate, .maskCommand]))
+    precondition(!shortcut.matches(key: 49, flags: [.maskControl, .maskAlternate]))
+    precondition(shortcut.label == "⌃⌥ P")
+    let shortcutData = try JSONEncoder().encode(shortcut)
+    let decodedShortcut = try JSONDecoder().decode(PingKeyboardShortcut.self, from: shortcutData)
+    precondition(decodedShortcut == shortcut)
+    var chord = PingShortcutState()
+    precondition(chord.down(matches: false, point: .zero) == nil && !chord.held)
+    precondition(chord.down(matches: true, point: .zero) == .begin(.zero))
+    precondition(chord.down(matches: true, point: .zero) == nil) // Key repeat cannot re-arm.
+    chord.cancel()
+    precondition(chord.held && !chord.active)
+    precondition(chord.down(matches: true, point: .zero) == nil)
+    precondition(chord.up(point: .zero) == nil && !chord.held)
+    precondition(chord.down(matches: true, point: .zero) == .begin(.zero))
+    precondition(chord.up(point: CGPoint(x: 80, y: 0)) == .release(CGPoint(x: 80, y: 0)))
+    precondition(chord.up(point: .zero) == nil)
     for name in PingArtwork.names { precondition(PingArtwork.image(name) != nil, "Missing bundled artwork: \(name)") }
     var gesture = PingInputState()
     precondition(gesture.flags(option: true, other: false, point: .zero) == .begin(.zero))
@@ -21,6 +41,37 @@ import Vision
     precondition(gesture.flags(option: false, other: false, point: .zero) == nil)
     _ = gesture.flags(option: true, other: false, point: .zero)
     precondition(gesture.flags(option: false, other: true, point: .zero) == .cancel)
+    var right = PingRightDragState()
+    let anchor = CGPoint(x: -300, y: 200)
+    let near = CGPoint(x: -290, y: 200)
+    let selected = CGPoint(x: -220, y: 200)
+    right.down(at: anchor)
+    precondition(right.move(to: near).isEmpty) // Exactly 10 points still counts as a click.
+    let click = right.up(at: near)
+    precondition(click.replayClick && click.signal == nil && right.origin == nil)
+    right.down(at: anchor)
+    precondition(right.move(to: selected) == [.begin(anchor), .move(selected)])
+    precondition(right.move(to: anchor) == [.move(anchor)])
+    let centered = right.up(at: anchor)
+    precondition(!centered.replayClick && centered.signal == .release(anchor))
+    precondition(CaptureGeometry.slice(delta: .zero) == nil) // Returning to center never becomes a context click.
+    right.down(at: anchor)
+    _ = right.move(to: selected)
+    let released = right.up(at: selected)
+    precondition(!released.replayClick && released.signal == .release(selected))
+    precondition(right.up(at: selected).signal == nil) // One release per gesture.
+    for crossedThreshold in [false, true] {
+        right.down(at: anchor)
+        if crossedThreshold { _ = right.move(to: selected) }
+        right.cancel() // Esc, modifier, trigger change, busy rejection, or gesture expiry.
+        precondition(right.move(to: selected).isEmpty)
+        let canceled = right.up(at: selected)
+        precondition(!canceled.replayClick && canceled.signal == nil && right.origin == nil)
+    }
+    right.down(at: anchor)
+    right.cancel()
+    right.down(at: anchor) // Fresh down recovers from a missing mouse-up.
+    precondition(right.up(at: anchor).replayClick) // Cancellation does not poison the next click.
     precondition(CaptureGeometry.slice(delta: .zero) == nil)
     precondition(CaptureGeometry.slice(delta: CGPoint(x: 46, y: 0)) == nil)
     precondition(CaptureGeometry.slice(delta: CGPoint(x: 0, y: -80)) == 0)
@@ -106,7 +157,7 @@ import Vision
     let legacyAction = Data(#"{"id":"analyze","name":"分析","symbol":"star","prompt":"旧模板"}"#.utf8)
     let decodedAction = try JSONDecoder().decode(PingAction.self, from: legacyAction)
     precondition(decodedAction.createsTask)
-    print("PASS: trigger mapping, bundled artwork, cancel running, deletion persistence/shared captures/rollback, effect-only guard and legacy template decoding")
+    print("PASS: trigger mapping, right-drag threshold/click/cancel/release, custom shortcut matching/persistence/repeat/cancellation, bundled artwork, cancel running, deletion persistence/shared captures/rollback, effect-only guard and legacy template decoding")
     let pageData = Data(#"{"meta":{"schema_version":1,"timezone":"Asia/Shanghai","username":"group-a","start":"2026-09-01","end":"2026-10-01","total_matches":22,"returned":0},"items":[]}"#.utf8)
     let page = try WxviewAdapter.decode(WxSearchPage.self, pageData)
     precondition(page.contextPage.meta.hasMore)

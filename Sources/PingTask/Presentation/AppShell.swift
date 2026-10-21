@@ -86,7 +86,7 @@ struct ContentView: View {
                     Circle().fill(desktop.enabled ? Color.green : Color.secondary).frame(width: 6, height: 6)
                     Text(desktop.enabled ? "全局 Ping 已开启" : "全局 Ping 未开启").font(.caption)
                 }
-                Text("触发键  \(desktop.trigger.label)").font(.caption2).foregroundStyle(.secondary)
+                Text("触发方式  \(desktop.triggerLabel)").font(.caption2).foregroundStyle(.secondary)
             }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
                 .padding(.bottom, 16)

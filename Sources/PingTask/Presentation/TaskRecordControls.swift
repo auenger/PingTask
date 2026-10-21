@@ -1,11 +1,53 @@
 import SwiftUI
+import AppKit
 
 struct PingTriggerPicker: View {
     @ObservedObject var model: DesktopPingController
+    @State private var monitor: Any?
+    @State private var recording = false
+    @State private var hint = ""
     var body: some View {
-        Picker("全局触发键", selection: Binding(get: { model.trigger }, set: { model.setTrigger($0) })) {
-            ForEach(PingTrigger.allCases) { key in Text(key.label).tag(key) }
-        }.pickerStyle(.segmented).frame(maxWidth: 390).disabled(model.busy)
+        VStack(alignment: .leading, spacing: 10) {
+            Picker("全局触发方式", selection: Binding(get: { model.trigger }, set: { model.setTrigger($0) })) {
+                ForEach(PingTrigger.allCases) { key in Text(key.label).tag(key) }
+            }.pickerStyle(.segmented).frame(maxWidth: 660).disabled(model.busy || recording)
+            if model.trigger == .shortcut {
+                HStack {
+                    Text(model.shortcut.label).font(.system(.body, design: .monospaced))
+                    Button(recording ? "取消录入（Esc）" : "录入快捷键") {
+                        if recording { stopRecording() } else { startRecording() }
+                    }
+                    .disabled(model.busy)
+                }
+                Text(recording ? (hint.isEmpty ? "请按一个包含 ⌃ Control、⌥ Option 或 ⌘ Command 的组合键。" : hint) : "按住组合键并移动选择，先松开主键触发；Esc 或回中心取消。启用后，此快捷键由 PingTask 接管。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }.onDisappear { stopRecording() }
+    }
+    private func stopRecording() {
+        guard recording || monitor != nil else { return }
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil; recording = false; hint = ""
+        model.recordShortcut(false)
+    }
+    private func startRecording() {
+        recording = true; hint = ""; model.recordShortcut(true)
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            MainActor.assumeIsolated {
+                if event.keyCode == 53 { stopRecording(); return }
+                let flags = CGEventFlags(rawValue: UInt64(event.modifierFlags.rawValue)).intersection(PingKeyboardShortcut.modifierMask)
+                guard !flags.intersection([.maskControl, .maskAlternate, .maskCommand]).isEmpty else {
+                    hint = "请同时按住 ⌃ Control、⌥ Option 或 ⌘ Command，避免接管普通文字输入。"
+                    return
+                }
+                let names: [UInt16: String] = [36: "Return", 48: "Tab", 49: "Space", 51: "Delete", 123: "←", 124: "→", 125: "↓", 126: "↑"]
+                let label = names[event.keyCode] ?? event.charactersIgnoringModifiers?.uppercased().prefix(16).description ?? "Key \(event.keyCode)"
+                let shortcut = PingKeyboardShortcut(keyCode: event.keyCode, modifiers: flags.rawValue, keyLabel: label)
+                stopRecording(); model.setShortcut(shortcut)
+                return
+            }
+            return nil
+        }
     }
 }
 

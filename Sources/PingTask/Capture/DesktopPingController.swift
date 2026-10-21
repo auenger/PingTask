@@ -4,6 +4,13 @@ import ApplicationServices
 
 @MainActor final class DesktopPingController: ObservableObject {
     @Published var trigger = PingTrigger(rawValue: UserDefaults.standard.string(forKey: "pingTrigger") ?? "") ?? .alt
+    @Published private(set) var shortcut: PingKeyboardShortcut = {
+        guard let data = UserDefaults.standard.data(forKey: "pingKeyboardShortcut"),
+              let value = try? JSONDecoder().decode(PingKeyboardShortcut.self, from: data),
+              !value.flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty else { return .standard }
+        return value
+    }()
+    var triggerLabel: String { trigger == .shortcut ? shortcut.label : trigger.label }
     @Published var enabled = false
     @Published var busy = false
     @Published var status = "启用后，按住 ⌥ Option，移动指针选择动作，松手捕获；Esc 或回中心取消。"
@@ -39,7 +46,8 @@ import ApplicationServices
     init(store: Store) {
         self.store = store
         input.trigger = trigger
-        status = "按住 \(trigger.label)，移动选择动作，松手捕获。"
+        input.shortcut = shortcut
+        status = "按住 \(triggerLabel)，移动选择动作，松手捕获。"
         input.receive = { [weak self] signal in self?.handle(signal) }
     }
     func setTrigger(_ value: PingTrigger) {
@@ -49,7 +57,19 @@ import ApplicationServices
         trigger = value
         input.trigger = value
         UserDefaults.standard.set(value.rawValue, forKey: "pingTrigger")
-        status = "触发键已改为 \(value.label)，松开所有按键后开始。"
+        status = "触发方式已改为 \(value.label)，松开所有按键和鼠标按钮后开始。"
+    }
+    func recordShortcut(_ recording: Bool) {
+        cancelGesture(); input.disarm(); input.recordingShortcut = recording
+    }
+    func setShortcut(_ value: PingKeyboardShortcut) {
+        guard !value.flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty,
+              let data = try? JSONEncoder().encode(value) else { return }
+        cancelGesture(); input.disarm()
+        shortcut = value; input.shortcut = value
+        UserDefaults.standard.set(data, forKey: "pingKeyboardShortcut")
+        setTrigger(.shortcut)
+        status = "触发快捷键已设为 \(value.label)，按住组合键并移动选择，松手触发。"
     }
     func forgetDeletedTask(_ id: UUID) {
         guard taskID == id else { return }

@@ -23,7 +23,7 @@ struct AppSettingsView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Label("触发方式", systemImage: "keyboard").font(.headline)
                     PingTriggerPicker(model: desktop)
-                    Text("按住触发键，移动选择，松手触发。回到中心、Esc 或右键取消。其他组合键继续交给当前应用。").font(.callout).foregroundStyle(.secondary)
+                    Text(desktop.trigger == .shortcut ? "Option 与 Alt 是同一个键。自定义组合键在此录入并保存，下次启动继续使用。" : desktop.trigger.instructions).font(.callout).foregroundStyle(.secondary)
                 }.appSurface()
                 VStack(alignment: .leading, spacing: 20) {
                     HStack {

@@ -132,7 +132,7 @@ struct DesktopCaptureView: View {
                                 }
                             }
                             Divider()
-                            Text("按住 \(model.trigger.label) → 移动选择 → 松手\n中心、Esc 或右键取消").font(.caption).foregroundStyle(.secondary).lineSpacing(5)
+                            Text("按住 \(model.triggerLabel) → 移动选择 → 松手\n\(model.trigger.cancellationHint)").font(.caption).foregroundStyle(.secondary).lineSpacing(5)
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }.padding(.vertical, 12)
                     HStack(alignment: .top, spacing: 20) {

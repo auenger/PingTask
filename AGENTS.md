@@ -26,7 +26,9 @@ product behavior:
 - Swift Package Manager executable, SwiftUI and AppKit, no third-party Swift dependencies. External executors require their local CLI/runtime; WorkBuddy additionally requires Python 3.
 - Deployment target macOS 13; macOS 13 capture and multi-display behavior still need real testing.
 - `main.swift`: models, Store, deterministic demo data, simulated executor, app and CLI entry points.
-- `Capture/`: configurable Alt / Ctrl event tap, single-window ScreenCaptureKit capture, Vision OCR, capture controller and isolated checks.
+- `Capture/`: configurable Option (Alt) / Control / right-button drag / recorded keyboard shortcut event tap, single-window ScreenCaptureKit capture, Vision OCR, capture controller and isolated checks.
+- Right-button drag claims the button sequence, enters the wheel after 10 points and replays ordinary clicks through the tap proxy on release. Preserve cancellation through mouse-up; do not let canceled drags open context menus.
+- Custom shortcuts persist physical key codes and exact modifier combinations in preferences. Recording requires Control, Option or Command (Shift may be added). Keep repeat suppression and key ownership through release; releasing a modifier before the main key cancels. Remove the local recording monitor when recording ends or the view disappears. Option and Alt are the same key.
 - `SourceAdapter/`: bounded wxview CLI calls, schema validation, single-account checks and fixtures.
 - Recent conversation lists use `sessions` sorted by last message time, not contact username.
   Retain the address-book fallback; deduplicate IDs across offset pages after cache changes.
