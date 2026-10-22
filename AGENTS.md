@@ -39,7 +39,7 @@ product behavior:
   Keep the first request's Unix bounds across pages; metadata times are formatted
   in the CLI timezone. Never compare formatted times directly to Unix strings,
   execute arbitrary next_args, or silently fall back to legacy seq-only paging.
-- `Resolver/`: title/OCR clues, bounded message search and explicit candidate confirmation.
+- `Resolver/`: title/OCR clues, bounded message search and explicit candidate confirmation. Low OCR confidence must not block wxview retrieval. A full query may fall back to at most three literal fragments in the same pinned account/conversation/date range; fragment hits remain candidates. Automatic binding requires a unique exact contact, unique wxview text message containing the complete normalized pointed text (at least 12 alphanumeric/CJK characters), and untruncated context. Preserve review candidates when automatic binding is rejected.
 - `Presentation/`: sidebar app shell, desktop source review, intent editor, task records, WeChat connection, settings, wheel and transient effects.
 - `Intent/`: stable intent CRUD, wheel membership/order, artwork catalog and bounded local image import.
 - `Resources/`: upstream PNG/WebP artwork, catalog and license. The gold question mark is the app logo.

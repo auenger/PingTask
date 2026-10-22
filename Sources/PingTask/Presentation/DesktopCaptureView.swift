@@ -70,6 +70,17 @@ struct DesktopCaptureView: View {
                         } else {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("核对消息来源").font(.headline)
+                            if !pending {
+                                Label(confirmedSourceLabel, systemImage: "checkmark.circle").foregroundStyle(AppStyle.gold)
+                            } else if let contact = model.chosenContact {
+                                Label("已定位会话：\(contact.name)", systemImage: "bubble.left.and.bubble.right")
+                                    .font(.callout).foregroundStyle(AppStyle.gold)
+                                Text(model.results?.items.isEmpty == false ? "请选择下方 wxview 原文确认消息来源。" : "会话已找到，请核对检索文字和日期。")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            } else {
+                                Text("会话与消息待核对；截图已保存。")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                             TextField("会话标题 / 群名", text: $model.conversationQuery)
                                 .onChange(of: model.conversationQuery) { _ in model.contacts = []; model.chosenContact = nil; model.results = nil }
                             TextField("指针附近的消息文字（至少 3 字）", text: $model.messageQuery)
@@ -107,7 +118,9 @@ struct DesktopCaptureView: View {
                                 }
                             }
                             Divider()
-                            Button("未定位会话，仅保留截图草稿") { model.keepScreenshot() }.disabled(!pending)
+                            Button("仅使用截图作为来源") { model.keepScreenshot() }.disabled(!pending)
+                            Text("截图也可交给 Codex 看图分析；请先确认使用截图，再到任务草稿明确提交。WorkBuddy 当前不支持此截图视觉输入。")
+                                .font(.caption).foregroundStyle(.secondary)
                             if !pending { Button("查看任务草稿", action: openTasks).buttonStyle(.borderedProminent) }
                         }.frame(width: 370)
                         }
@@ -174,4 +187,7 @@ struct DesktopCaptureView: View {
         }
     }
     private var pending: Bool { store.tasks.first(where: { $0.id == model.taskID }) .map { $0.requiresSourceConfirmation == true && $0.status == "待确认" } == true }
+    private var confirmedSourceLabel: String {
+        store.tasks.first(where: { $0.id == model.taskID })?.source.hasPrefix("capture/") == true ? "已选择截图来源" : "来源已确认"
+    }
 }

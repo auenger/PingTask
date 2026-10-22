@@ -225,6 +225,24 @@ import Vision
         model.enterpriseContext = EnterpriseContext(identity: LarkIdentity(profile: "fixture", app: "app", brand: "lark", user: "user"), chatID: "oc_fixture", chatName: "合成项目群",
             messages: [EnterpriseMessage(id: "om_fixture", chat: "oc_fixture", text: "请分析这次需求变更，并整理下一步任务。此消息是界面测试数据。", sender: "测试成员", time: "2026-10-21 10:30")], hasMore: true, start: Date().addingTimeInterval(-86400), end: Date())
     }
+    if tab == 11 {
+        let target = DesktopTarget(windowID: 1, processID: 1, appName: "微信（合成预览）", bundleID: "com.tencent.xinWeChat", title: "合成联系人",
+            bounds: CGRect(x: 0, y: 0, width: 1000, height: 800), pointer: CGPoint(x: 500, y: 400), displayID: 1, scale: 1)
+        let capture = DesktopCapture(id: UUID(), created: Date(), target: target, pixelWidth: 1000, pixelHeight: 800,
+            lines: [OCRLine(text: "请整理一下 下周的任务，并且列出依赖", bounds: CGRect(x: 0.3, y: 0.48, width: 0.6, height: 0.04), confidence: 0.5)])
+        store.capture(SourceMessage(id: "fixture", app: "微信", chat: "待核对", sender: "OCR", text: capture.pointedText,
+            resolvedAnchor: "capture/fixture"), action: store.actions[0], executor: "Codex", desktopCapture: capture)
+        model.capture = capture; model.taskID = store.selected
+        model.conversationQuery = "合成联系人"; model.messageQuery = capture.pointedText
+        model.account = WxAccount(account: "fixture", username: "self", displayName: "演示账号", dataDirFingerprint: "fixture", dataDir: "/example/fixture")
+        let contact = WxContact(username: "fixture-chat", remark: "合成联系人", nickName: "", alias: "")
+        model.contacts = [contact]; model.chosenContact = contact
+        model.results = WxSearchPage(meta: .init(schemaVersion: 1, timezone: "Asia/Shanghai", username: contact.username,
+            start: "2026-09-22", end: "2026-10-22", totalMatches: 1, returned: 1), items: [
+                WxMessage(id: "fixture-message", chatUsername: contact.username, chatDisplayName: contact.name, fromUsername: "测试成员",
+                    time: "2026-10-22 12:00:00", type: 1, content: "请整理一下下周的任务，并且列出依赖和验收条件。此消息为合成数据。", contentDetail: nil)])
+        model.status = "合成预览：会话已定位，消息候选待核对；不读取真实聊天。"
+    }
     let content = Group {
         if tab == 10 {
             ScrollView { EnterpriseCaptureView(model: model, store: store, platform: .lark).padding(28) }
@@ -260,7 +278,7 @@ import Vision
                 """).padding(28)
             }.frame(width: 920, height: 860).background(AppStyle.canvas).preferredColorScheme(.dark)
         } else {
-            ContentView(store: store, desktop: model, initialTab: tab)
+            ContentView(store: store, desktop: model, initialTab: tab == 11 ? 4 : tab)
         }
     }.frame(width: 1280, height: 860)
     let hosting = NSHostingView(rootView: content)

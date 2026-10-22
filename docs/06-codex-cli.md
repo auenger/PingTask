@@ -27,7 +27,7 @@ PingTask 负责来源、用户确认、初次执行、session 关联和找回。
 
 - `submissions.sqlite`：task 唯一、operation 唯一，存储不可变 payload 和 queued / dispatching 阶段。
 - `<operation>/submission.json`、`prompt.txt`：冻结目录、权限、提示词、执行器路径与图片引用；认证仍由 Codex 管理。
-- `<operation>/capture-*.png`：最多 4 张独立截图副本；删除原记录不会删除已提交的证据。
+- `<operation>/capture-*.png`：最多 4 张独立截图副本；删除原记录不会删除已提交的证据。提示词列出各图像素尺寸及原始 Ping 坐标（0–1，左上角原点，x 向右 / y 向下），让 Codex 围绕指针位置分析；图片推断不自动写回 wxview 消息身份。
 - `started.lock`：O_EXCL 创建，worker 不可重复启动。
 - `progress.json`：原子写入的 session、最近输出、首次执行状态、退出码与时间。
 - `events.jsonl`：最多 8 MB 的原始执行日志；界面输出最多 32000 字。

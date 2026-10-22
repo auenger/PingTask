@@ -1,6 +1,7 @@
 import Foundation
 
 @MainActor func runWxviewChecks() throws {
+    try runWeChatLookupChecks()
     try runWxBrowsingChecks()
     try runWxMediaChecks()
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("PingTask-wx-tests-\(UUID())")

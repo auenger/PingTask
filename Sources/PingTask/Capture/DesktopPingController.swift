@@ -206,9 +206,22 @@ import ApplicationServices
                         showReview()
                         return
                     } catch {
-                        status = (error as? WxFailure)?.message ?? "自动定位失败，已保留截图草稿；请人工核对。"
+                        guard generation == token else { return }
                         busy = false
-                        showReview()
+                        if let review = error as? WeChatCandidateReview {
+                            account = review.account; contacts = [review.contact]
+                            chosenContact = review.contact; results = review.page
+                            status = review.reason
+                            showReview()
+                        } else if let review = error as? WeChatConversationReview {
+                            account = review.account; contacts = review.contacts
+                            chosenContact = nil; results = nil
+                            status = review.contacts.isEmpty ? "未找到会话候选，请核对联系人名称。" : "会话尚未唯一精确匹配，请选择下方联系人后检索。"
+                            showReview()
+                        } else {
+                            status = (error as? WxFailure)?.message ?? "自动定位失败，已保留截图草稿；请人工核对。"
+                            showReview()
+                        }
                         return
                     }
                 }
@@ -238,7 +251,11 @@ import ApplicationServices
         guard !busy, let captured = task.captures?.last else { return }
         generation = UUID(); capture = captured; taskID = task.id
         prepare(captured); showReview()
-        status = "已打开保存的捕获；核对 OCR 线索或修改检索范围后定位。"
+        if task.requiresSourceConfirmation == true, captured.target.bundleID == "com.tencent.xinWeChat", !captured.target.isTextEntry {
+            locateConversation(automatic: true)
+        } else {
+            status = task.requiresSourceConfirmation == true ? "已打开保存的捕获，请核对消息来源。" : "来源已确认，可查看任务草稿；打开记录不会自动提交。"
+        }
     }
     func locateConversation(automatic: Bool = false) {
         guard !busy, let capture else { return }
@@ -251,6 +268,7 @@ import ApplicationServices
         }
         let adapter = WxviewAdapter(path: adapterPath)
         let pinned = account
+        let lookupGeneration = generation, lookupTask = taskID
         busy = true; contacts = []; results = nil; chosenContact = nil
         status = "正在用窗口标题 / OCR 查找会话候选…"
         Task {
@@ -267,13 +285,19 @@ import ApplicationServices
                     var seen = Set<String>(), exactSeen = Set<String>()
                     return (identity, contacts.filter { seen.insert($0.id).inserted }, exact.filter { exactSeen.insert($0.id).inserted })
                 }.value
+                guard generation == lookupGeneration, taskID == lookupTask else { return }
                 account = resolved.0; contacts = resolved.1; busy = false
-                if resolved.2.count == 1 && messageQuery.count >= 3 {
-                    search(in: resolved.2[0])
+                if resolved.2.count == 1 {
+                    chosenContact = resolved.2[0]
+                    if messageQuery.count >= 3 { search(in: resolved.2[0]) }
+                    else { status = "已定位会话「\(resolved.2[0].name)」，消息文字不足，请补充至少 3 字后检索。" }
                 } else {
                     status = contacts.isEmpty ? "未找到会话候选；截图已保留，请修正会话标题。" : "会话仍需核对：选择候选后检索指针附近文字。候选最多 60 个。"
                 }
-            } catch { busy = false; status = (error as? WxFailure)?.message ?? "会话定位失败；截图已保留" }
+            } catch {
+                guard generation == lookupGeneration, taskID == lookupTask else { return }
+                busy = false; status = (error as? WxFailure)?.message ?? "会话定位失败；截图已保留"
+            }
         }
     }
     func search(in contact: WxContact) {
@@ -285,15 +309,20 @@ import ApplicationServices
         chosenContact = contact; results = nil; busy = true
         let query = messageQuery, start = MessageClues.day(startDate), end = MessageClues.day(endDate)
         let adapter = WxviewAdapter(path: adapterPath)
+        let lookupGeneration = generation, lookupTask = taskID
         status = "正在会话内检索 OCR 文字（\(start) — \(end)）…"
         Task {
             do {
                 let page = try await Task.detached(priority: .userInitiated) {
-                    try adapter.searchMessages(account: account, conversation: contact.username, query: query, start: start, end: end)
+                    try adapter.searchMessageCandidates(account: account, conversation: contact.username, text: query, start: start, end: end)
                 }.value
+                guard generation == lookupGeneration, taskID == lookupTask else { return }
                 results = page
-                status = page.items.isEmpty ? "此范围内没有匹配；可修正 OCR、调整历史日期，或保留截图草稿。" : "找到 \(page.meta.totalMatches) 条匹配，显示 \(page.items.count) 条；请核对发言人、时间和正文后确认。缓存可能延迟。"
-            } catch { status = (error as? WxFailure)?.message ?? "消息定位失败；截图已保留" }
+                status = page.items.isEmpty ? "已定位会话「\(contact.name)」，但整段及片段检索均无消息匹配；请调整文字或日期，并检查 wxview 同步状态。" : "已定位会话「\(contact.name)」，找到 \(page.meta.totalMatches) 条消息候选，显示 \(page.items.count) 条；请核对原文后确认。片段命中不代表已确认来源。"
+            } catch {
+                guard generation == lookupGeneration, taskID == lookupTask else { return }
+                status = (error as? WxFailure)?.message ?? "消息定位失败；截图已保留"
+            }
             busy = false
         }
     }

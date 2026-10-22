@@ -19,6 +19,20 @@ struct WxSearchPage: Decodable {
     }
 }
 extension WxviewAdapter {
+    // Each search stays in the pinned account, conversation and date range. Never refresh
+    // or search all chats. Fragment hits are candidates; automatic binding verifies the
+    // complete normalized pointed text against the returned source message separately.
+    func searchMessageCandidates(account: WxAccount, conversation: String, text: String, start: String, end: String) throws -> WxSearchPage {
+        let queries = MessageClues.searchQueries(text)
+        guard !queries.isEmpty else { throw WxFailure(message: "已定位会话，但消息文字不足 3 字，请补充文字后检索") }
+        var last: WxSearchPage?
+        for query in queries {
+            let page = try searchMessages(account: account, conversation: conversation, query: query, start: start, end: end)
+            if !page.items.isEmpty { return page }
+            last = page
+        }
+        return last!
+    }
     func searchMessages(account: WxAccount, conversation: String, query: String, start: String, end: String) throws -> WxSearchPage {
         guard query.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3, !conversation.isEmpty else {
             throw WxFailure(message: "定位关键词至少 3 个字符，并且需要明确会话")
@@ -61,6 +75,19 @@ enum MessageClues {
     static func keyword(_ text: String) -> String {
         // Use literal visible text; no command language or instructions are evaluated.
         String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(48))
+    }
+    static func searchQueries(_ text: String) -> [String] {
+        let literal = keyword(text)
+        guard literal.count >= 3 else { return [] }
+        // Whitespace and punctuation from Vision are not reliable message delimiters.
+        // Keep literal contiguous runs rather than inventing words or executing OCR text.
+        let runs = literal.components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { $0.count >= 3 }
+        let fragments = runs.enumerated().sorted {
+            $0.element.count == $1.element.count ? $0.offset < $1.offset : $0.element.count > $1.element.count
+        }.map { String($0.element.prefix(12)) }
+        var seen = Set<String>()
+        return ([literal] + fragments).filter { seen.insert($0).inserted }.prefix(4).map { $0 }
     }
     static func day(_ date: Date) -> String {
         let formatter = DateFormatter()
